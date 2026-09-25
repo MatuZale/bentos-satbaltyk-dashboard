@@ -325,6 +325,45 @@ body {
   color: var(--text-muted);
 }
 
+.speed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.speed-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.speed-btn {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.speed-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.speed-btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
 /* Panel punktow rosnie i wypelnia reszte wysokosci paska bocznego, ale sam
    sie nie przewija - przewija sie tylko lista punktow w srodku (.points-list),
    zeby duza liczba pinow nie wymuszala scrollowania calego panelu. */

@@ -1,6 +1,8 @@
 import { formatTimestamp } from "../utils/grid";
 
-export default function TimeControl({ timestamps, index, onChange, playing, onTogglePlay }) {
+const SPEEDS = [0.5, 1, 2, 4];
+
+export default function TimeControl({ timestamps, index, onChange, playing, onTogglePlay, speed, onSpeedChange }) {
   const entry = timestamps[index];
 
   return (
@@ -25,6 +27,18 @@ export default function TimeControl({ timestamps, index, onChange, playing, onTo
       <div className="time-label">
         {entry ? formatTimestamp(entry.t) : "—"}
         <span className="time-label-tz"> (czas lokalny)</span>
+      </div>
+      <div className="speed-row">
+        <span className="speed-label">Tempo</span>
+        {SPEEDS.map((s) => (
+          <button
+            key={s}
+            className={`speed-btn${speed === s ? " is-active" : ""}`}
+            onClick={() => onSpeedChange(s)}
+          >
+            {s}×
+          </button>
+        ))}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import BuoyCamera from "./BuoyCamera";
 import { simulateBuoyReading } from "../utils/simulate";
 import { degToCompass, formatTimestamp } from "../utils/grid";
+import { useAnimatedNumber, shortestAngleDelta } from "../utils/useAnimatedNumber";
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
@@ -53,18 +54,28 @@ export default function BuoyModal({ buoy, timestampIso, onClose }) {
 
   const r = simulateBuoyReading(buoy.id, timestampIso);
 
+  // Animowane (rAF, ease-out) wartosci - przy przejsciu na nowa klatke czasu
+  // liczby i paski plynnie "dobiegaja" do nowego odczytu zamiast skakac.
+  const waterTemp = useAnimatedNumber(r.waterTemp);
+  const waveHeight = useAnimatedNumber(r.waveHeight);
+  const windSpeed = useAnimatedNumber(r.windSpeed);
+  const windDir = useAnimatedNumber(r.windDir, { deltaFn: shortestAngleDelta });
+  const pressure = useAnimatedNumber(r.pressure);
+  const battery = useAnimatedNumber(r.battery);
+  const signal = useAnimatedNumber(r.signal);
+
   const tiles = [
-    { label: "Temp. wody", value: r.waterTemp.toFixed(1), unit: "°C", frac: clamp01(r.waterTemp / 25) },
-    { label: "Wys. fali", value: r.waveHeight.toFixed(2), unit: "m", frac: clamp01(r.waveHeight / 3) },
+    { label: "Temp. wody", value: waterTemp.toFixed(1), unit: "°C", frac: clamp01(waterTemp / 25) },
+    { label: "Wys. fali", value: waveHeight.toFixed(2), unit: "m", frac: clamp01(waveHeight / 3) },
     {
       label: "Wiatr",
-      value: r.windSpeed.toFixed(0),
-      unit: `km/h ${degToCompass(r.windDir)}`,
-      frac: clamp01(r.windSpeed / 40),
+      value: windSpeed.toFixed(0),
+      unit: `km/h ${degToCompass(((windDir % 360) + 360) % 360)}`,
+      frac: clamp01(windSpeed / 40),
     },
-    { label: "Ciśnienie", value: r.pressure.toFixed(0), unit: "hPa", frac: clamp01((r.pressure - 970) / 70) },
-    { label: "Bateria", value: r.battery, unit: "%", frac: clamp01(r.battery / 100) },
-    { label: "Sygnał", value: r.signal, unit: "/5", frac: clamp01(r.signal / 5) },
+    { label: "Ciśnienie", value: pressure.toFixed(0), unit: "hPa", frac: clamp01((pressure - 970) / 70) },
+    { label: "Bateria", value: Math.round(battery), unit: "%", frac: clamp01(battery / 100) },
+    { label: "Sygnał", value: Math.round(signal), unit: "/5", frac: clamp01(signal / 5) },
   ];
 
   return (
@@ -75,9 +86,11 @@ export default function BuoyModal({ buoy, timestampIso, onClose }) {
     >
       <div className="modal-header buoy-panel-handle" onMouseDown={handleDragStart}>
         <div>
-          <span className="modal-title">{buoy.name}</span>
+          <span className="modal-title">Boja „{buoy.name}”</span>
           <span className="buoy-sim-tag">symulacja</span>
-          <div className="modal-subtitle">{buoy.lat.toFixed(4)}, {buoy.lon.toFixed(4)}</div>
+          <div className="modal-subtitle">
+            {buoy.place} · {buoy.lat.toFixed(4)}, {buoy.lon.toFixed(4)}
+          </div>
         </div>
         <button className="modal-close" onClick={onClose} aria-label="Zamknij">
           ×

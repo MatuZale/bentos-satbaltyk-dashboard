@@ -42,6 +42,7 @@ export default function App() {
   const [product, setProduct] = useState("sst");
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1); // mnoznik tempa animacji (0.5x-4x), patrz TimeControl
   const [gridData, setGridData] = useState(null);
   const [hoverLatLng, setHoverLatLng] = useState(null); // { lat, lon } | null - tylko pozycja kursora
   const [pins, setPins] = useState([]); // [{ id, lat, lon }]
@@ -107,14 +108,14 @@ export default function App() {
     if (next) getGrid(next.grid);
   }, [entries, index]);
 
-  // Animacja odtwarzania
+  // Animacja odtwarzania - predkosc ustawiana przez uzytkownika (patrz TimeControl)
   useEffect(() => {
     if (!playing || entries.length < 2) return;
     const id = setInterval(() => {
       setIndex((i) => (i + 1) % entries.length);
-    }, PLAY_INTERVAL_MS);
+    }, PLAY_INTERVAL_MS / speed);
     return () => clearInterval(id);
-  }, [playing, entries.length]);
+  }, [playing, entries.length, speed]);
 
   function handleSelectProduct(nextProduct) {
     setPlaying(false);
@@ -179,6 +180,8 @@ export default function App() {
             }}
             playing={playing}
             onTogglePlay={() => setPlaying((p) => !p)}
+            speed={speed}
+            onSpeedChange={setSpeed}
           />
         </section>
 
