@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar";
 import TimeControl from "./components/TimeControl";
 import Legend from "./components/Legend";
 import PointsPanel from "./components/PointsPanel";
+import ChartModal from "./components/ChartModal";
 import { getGrid, sampleGrid, findNearestIndex, formatProductValue } from "./utils/grid";
 import "./App.css";
 
@@ -43,6 +44,7 @@ export default function App() {
   const [hover, setHover] = useState(null); // { lat, lon, value } | null
   const [pins, setPins] = useState([]); // [{ id, lat, lon }]
   const [pinMode, setPinMode] = useState(false); // czy klik na mapie dodaje punkt (jawnie wlaczane przyciskiem)
+  const [chartPinId, setChartPinId] = useState(null); // ktory punkt ma otwarty wykres w czasie
 
   function loadManifest(isFirstLoad) {
     return fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
@@ -111,6 +113,7 @@ export default function App() {
 
   function handleSelectProduct(nextProduct) {
     setPlaying(false);
+    setChartPinId(null); // wykres pokazuje aktywna warstwe - przy zmianie warstwy staje sie nieaktualny
     const nextEntries = manifest.products[nextProduct].timestamps;
     const nearest = findNearestIndex(nextEntries, currentEntry?.t);
     setProduct(nextProduct);
@@ -135,6 +138,7 @@ export default function App() {
 
   function handleRemovePin(id) {
     setPins((prev) => prev.filter((p) => p.id !== id));
+    setChartPinId((cur) => (cur === id ? null : cur));
   }
 
   if (error) {
@@ -189,7 +193,11 @@ export default function App() {
           pinMode={pinMode}
           onTogglePinMode={() => setPinMode((v) => !v)}
           onRemove={handleRemovePin}
-          onClear={() => setPins([])}
+          onClear={() => {
+            setPins([]);
+            setChartPinId(null);
+          }}
+          onShowChart={setChartPinId}
         />
 
         <footer className="sidebar-footer">
@@ -217,6 +225,23 @@ export default function App() {
           onMapClick={handleAddPin}
         />
       </main>
+
+      {chartPinId &&
+        (() => {
+          const idx = pins.findIndex((p) => p.id === chartPinId);
+          if (idx === -1) return null;
+          return (
+            <ChartModal
+              point={pins[idx]}
+              pointIndex={idx}
+              product={activeProduct}
+              entries={entries}
+              grid={manifest.grid}
+              bbox={manifest.bbox}
+              onClose={() => setChartPinId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

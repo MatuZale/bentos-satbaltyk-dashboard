@@ -1,6 +1,6 @@
 const PIN_LETTERS = "ABCDEFGHIJ";
 
-export default function PointsPanel({ points, pinMode, onTogglePinMode, onRemove, onClear }) {
+export default function PointsPanel({ points, pinMode, onTogglePinMode, onRemove, onClear, onShowChart }) {
   return (
     <section className="panel points-panel">
       <div className="points-panel-head">
@@ -30,16 +30,23 @@ export default function PointsPanel({ points, pinMode, onTogglePinMode, onRemove
         <ul className="points-list">
           {points.map((p, i) => (
             <li key={p.id} className="points-row">
-              <span className="points-letter">{PIN_LETTERS[i] ?? "?"}</span>
-              <span className="points-coords">
-                {p.lat.toFixed(3)}, {p.lon.toFixed(3)}
-              </span>
-              <span className={`points-value${p.label ? "" : " points-value-empty"}`}>
-                {p.label ?? "brak danych"}
-              </span>
-              <button className="points-remove" onClick={() => onRemove(p.id)} aria-label="Usuń punkt">
-                ×
-              </button>
+              <div className="points-row-top">
+                <span className="points-letter">{PIN_LETTERS[i] ?? "?"}</span>
+                <span className="points-coords">
+                  {p.lat.toFixed(3)}, {p.lon.toFixed(3)}
+                </span>
+                <button className="points-remove" onClick={() => onRemove(p.id)} aria-label="Usuń punkt">
+                  ×
+                </button>
+              </div>
+              <div className="points-row-bottom">
+                <span className={`points-value${p.label ? "" : " points-value-empty"}`}>
+                  {p.label ?? "brak danych"}
+                </span>
+                <button className="points-chart-btn" onClick={() => onShowChart(p.id)}>
+                  pokaż wykres
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -70,3 +70,22 @@ export function formatTimestamp(iso) {
     minute: "2-digit",
   }).format(date);
 }
+
+// Krotszy format do etykiet na osi wykresu (bez dnia tygodnia).
+export function formatTimestampShort(iso) {
+  const date = new Date(iso);
+  return new Intl.DateTimeFormat("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+// Pobiera (z cache) siatki dla wszystkich podanych znacznikow czasu i probkuje
+// jedna wspolrzedna z kazdej z nich - do wykresu punktu w czasie.
+export async function loadPointSeries(entries, grid, bbox, lat, lon) {
+  const arrays = await Promise.all(entries.map((e) => getGrid(e.grid)));
+  return entries.map((e, i) => ({ t: e.t, value: sampleGrid(arrays[i], grid, bbox, lat, lon) }));
+}
