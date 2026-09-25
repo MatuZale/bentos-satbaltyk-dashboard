@@ -1,6 +1,8 @@
 # Bentos: SatBałtyk — dashboard dla Trójmiasta
 
-Prosty, lokalny dashboard webowy (React + Vite + Leaflet) do wizualizacji
+🔗 **Live:** https://matuzale.github.io/bentos-satbaltyk-dashboard/
+
+Prosty dashboard webowy (React + Vite + Leaflet) do wizualizacji
 danych z eksportu [SatBałtyk](https://satbaltyk.pl) na obszarze Zatoki
 Gdańskiej / Trójmiasta. Identyfikacja wizualna (kolory, fonty) nawiązuje do
 [bentos.info](https://bentos.info) — projektu monitoringu jakości wody w
@@ -37,6 +39,16 @@ public/data/manifest.json                    — katalog wszystkich dostępnych 
 
 Frontend nigdy nie dotyka oryginalnych GeoTIFF-ów — tylko wygenerowanych
 plików w `public/data/`.
+
+## Wdrożenie
+
+Każdy push na `main` (`.github/workflows/deploy.yml`) buduje frontend
+(`npm run build`) i publikuje go na GitHub Pages. **`public/data/` jest
+commitowane do repo** (to jedyne dane, jakich potrzebuje strona — surowe
+GeoTIFF-y z `dane/` zostają tylko lokalnie, są w `.gitignore`, ważą za dużo
+i nie są do niczego potrzebne po wygenerowaniu warstw). Żeby zaktualizować
+dane na żywej stronie: `npm run process-data` lokalnie, `git add public/data`,
+commit, push — reszta dzieje się sama.
 
 ## Uruchomienie
 
