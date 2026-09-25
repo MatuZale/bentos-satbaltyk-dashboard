@@ -41,6 +41,7 @@ body {
 .layout {
   display: flex;
   height: 100vh;
+  position: relative;
 }
 
 .sidebar {
@@ -55,48 +56,124 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
+  transition: width 0.25s ease, min-width 0.25s ease;
 }
 
-.sidebar-header {
-  padding: 24px 20px 16px;
+.sidebar.is-collapsed {
+  width: 0;
+  min-width: 0;
+  border-right-color: transparent;
 }
 
-.brand {
+/* Zawsze widoczny uchwyt do chowania/pokazywania panelu - siedzi dokladnie
+   na granicy panelu i mapy, przesuwa sie razem z animacja szerokosci. */
+.sidebar-toggle {
+  position: absolute;
+  top: 50%;
+  left: 340px;
+  transform: translate(-50%, -50%);
+  z-index: 800;
+  width: 22px;
+  height: 46px;
+  border-radius: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0 0 6px;
-  font-size: 20px;
-  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.25s ease, background 0.15s, color 0.15s;
 }
 
-.brand-highlight {
-  background: var(--accent);
-  color: var(--accent-ink);
-  padding: 1px 8px;
-  border-radius: 6px;
-  letter-spacing: -0.01em;
-}
-
-.brand-rest {
+.sidebar-toggle:hover {
+  background: var(--surface-alt);
   color: var(--text-primary);
 }
 
-.sidebar-header p {
-  margin: 0;
+.layout.sidebar-collapsed .sidebar-toggle {
+  left: 0;
+}
+
+/* Plakietka marki pływająca nad mapą (prawy górny róg) - logo Bentos +
+   lokalizacja. Zastępuje dawny naglowek tekstowy w panelu bocznym. */
+.brand-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 650;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 10px 14px;
+  background: rgba(0, 5, 31, 0.55);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.brand-badge-logo {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.brand-badge-location {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Plakietka "wersja alpha" - lewy dolny róg mapy, zeby nikt nie wzial tego
+   za gotowy produkt. Pulsujaca kropka wiaze sie z reszta "zywych" animacji. */
+.alpha-badge {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 650;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  max-width: 320px;
+  background: rgba(0, 5, 31, 0.65);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+.alpha-badge-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: alpha-blink 1.8s ease-in-out infinite;
+}
+
+.alpha-badge-text {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+
+.alpha-badge-text strong {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .product-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 4px 16px 16px;
+  padding: 20px 16px 16px;
 }
 
 .product-btn {
@@ -139,6 +216,11 @@ body {
 .product-btn-icon svg {
   width: 100%;
   height: 100%;
+  transition: transform 0.2s ease;
+}
+
+.product-btn:hover .product-btn-icon svg {
+  animation: icon-pulse 0.6s ease-in-out;
 }
 
 .product-btn-text {
@@ -215,11 +297,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: filter 0.15s;
+  transition: filter 0.15s, transform 0.15s;
 }
 
 .play-btn:hover {
   filter: brightness(1.1);
+  transform: scale(1.1);
 }
 
 .time-slider {
@@ -238,11 +321,23 @@ body {
   color: var(--text-muted);
 }
 
+/* Panel punktow rosnie i wypelnia reszte wysokosci paska bocznego, ale sam
+   sie nie przewija - przewija sie tylko lista punktow w srodku (.points-list),
+   zeby duza liczba pinow nie wymuszala scrollowania calego panelu. */
+.points-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .points-panel-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   margin-bottom: 12px;
+  flex: none;
 }
 
 .points-panel-head h2 {
@@ -266,6 +361,7 @@ body {
 }
 
 .points-add-btn {
+  flex: none;
   width: 100%;
   padding: 9px 12px;
   margin-bottom: 12px;
@@ -293,6 +389,7 @@ body {
 }
 
 .points-empty {
+  flex: none;
   margin: 0;
   font-size: 13px;
   color: var(--text-muted);
@@ -302,10 +399,28 @@ body {
 .points-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 4px 4px 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Cienki, dyskretny scrollbar dla listy punktow (Firefox + WebKit) */
+.points-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.points-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.points-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
 }
 
 .points-row {
@@ -478,6 +593,7 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: 0 0 0 3px rgba(170, 255, 0, 0.22);
+  animation: cursor-breathe 1.6s ease-in-out infinite;
 }
 
 .measure-cursor-dot svg {
@@ -514,6 +630,22 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.pin-marker:hover {
+  transform: scale(1.12);
+}
+
+/* Sonarowy "ping" - ciagle emanujacy pierscien, zeby przypiete punkty
+   wygladaly na aktywne pomiary, a nie statyczne znaczniki. */
+.pin-marker-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: pin-ping 2.4s ease-out infinite;
+  pointer-events: none;
 }
 
 .pin-marker-icon {
@@ -744,6 +876,64 @@ body {
   color: var(--accent);
 }
 
+/* Delikatne animacje "zywej" strony - sonarowy puls na punktach pomiarowych,
+   oddychajacy celownik, odbicie ikon przy hover. */
+@keyframes pin-ping {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.65;
+  }
+  70%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes cursor-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(170, 255, 0, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(170, 255, 0, 0.1);
+  }
+}
+
+@keyframes icon-pulse {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.22) rotate(-6deg);
+  }
+}
+
+@keyframes alpha-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-marker-ring,
+  .measure-cursor-dot,
+  .product-btn:hover .product-btn-icon svg,
+  .play-btn,
+  .pin-marker,
+  .sidebar,
+  .sidebar-toggle,
+  .alpha-badge-dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @media (max-width: 720px) {
   .layout {
     flex-direction: column;
@@ -752,5 +942,11 @@ body {
     width: 100%;
     min-width: 0;
     max-height: 55vh;
+  }
+  .sidebar.is-collapsed {
+    max-height: 0;
+  }
+  .sidebar-toggle {
+    display: none;
   }
 }

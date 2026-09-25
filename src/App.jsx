@@ -45,6 +45,7 @@ export default function App() {
   const [pins, setPins] = useState([]); // [{ id, lat, lon }]
   const [pinMode, setPinMode] = useState(false); // czy klik na mapie dodaje punkt (jawnie wlaczane przyciskiem)
   const [chartPinId, setChartPinId] = useState(null); // ktory punkt ma otwarty wykres w czasie
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   function loadManifest(isFirstLoad) {
     return fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
@@ -161,16 +162,8 @@ export default function App() {
   });
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <header className="sidebar-header">
-          <h1 className="brand">
-            <span className="brand-highlight">Bentos</span>
-            <span className="brand-rest">SatBałtyk</span>
-          </h1>
-          <p>Zatoka Gdańska · Trójmiasto</p>
-        </header>
-
+    <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}`}>
+      <aside className={`sidebar${sidebarOpen ? "" : " is-collapsed"}`}>
         <Sidebar products={manifest.products} activeProduct={product} onSelect={handleSelectProduct} />
 
         <section className="panel">
@@ -212,7 +205,27 @@ export default function App() {
         </footer>
       </aside>
 
+      <button
+        className="sidebar-toggle"
+        onClick={() => setSidebarOpen((v) => !v)}
+        aria-label={sidebarOpen ? "Schowaj panel" : "Pokaż panel"}
+      >
+        {sidebarOpen ? "‹" : "›"}
+      </button>
+
       <main className="map-wrap">
+        <div className="brand-badge">
+          <img src={`${import.meta.env.BASE_URL}brand/bentos-logo.png`} alt="Bentos" className="brand-badge-logo" />
+          <span className="brand-badge-location">Zatoka Gdańska · Trójmiasto</span>
+        </div>
+
+        <div className="alpha-badge">
+          <span className="alpha-badge-dot" />
+          <span className="alpha-badge-text">
+            <strong>ALPHA</strong> — wersja testowa, dane i wygląd mogą się jeszcze zmieniać
+          </span>
+        </div>
+
         <MapView
           bbox={manifest.bbox}
           imageUrl={currentEntry?.png}

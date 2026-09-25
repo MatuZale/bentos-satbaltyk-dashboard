@@ -10,6 +10,7 @@ const PIN_LETTERS = "ABCDEFGHIJ";
 function buildPinIcon(Icon, letter) {
   const html = renderToStaticMarkup(
     <div className="pin-marker">
+      <span className="pin-marker-ring" />
       <span className="pin-marker-icon">
         <Icon />
       </span>
