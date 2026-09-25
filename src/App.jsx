@@ -192,7 +192,12 @@ export default function App() {
               className={`switch${buoysVisible ? " is-on" : ""}`}
               role="switch"
               aria-checked={buoysVisible}
-              onClick={() => setBuoysVisible((v) => !v)}
+              onClick={() =>
+                setBuoysVisible((v) => {
+                  if (v) setOpenBuoyId(null); // chowamy boje - zamykamy tez ewentualny otwarty panel
+                  return !v;
+                })
+              }
             >
               <span className="switch-thumb" />
             </button>

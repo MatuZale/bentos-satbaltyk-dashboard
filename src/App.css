@@ -425,16 +425,19 @@ body {
   vertical-align: middle;
 }
 
+/* Wylaczone = niebieski (spokojny/nieaktywny), wlaczone ("live") = zielony -
+   ten sam akcent co reszta "zywych"/aktywnych elementow w aplikacji. */
 .switch {
   flex: none;
   position: relative;
   width: 38px;
   height: 22px;
   border-radius: var(--radius-full);
-  background: var(--surface-alt);
-  border: 1px solid var(--border-strong);
+  background: var(--accent-2-dim);
+  border: 1px solid var(--accent-2);
   cursor: pointer;
   padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .switch-thumb {
@@ -444,18 +447,18 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--text-muted);
+  background: var(--accent-2);
   transition: left 0.15s ease, background 0.15s ease;
 }
 
 .switch.is-on {
-  background: var(--accent-2-dim);
-  border-color: var(--accent-2);
+  background: var(--accent-dim);
+  border-color: var(--accent);
 }
 
 .switch.is-on .switch-thumb {
   left: 18px;
-  background: var(--accent-2);
+  background: var(--accent);
 }
 
 .points-empty {
@@ -753,16 +756,15 @@ body {
   justify-content: center;
 }
 
-/* Boje - stale, "oficjalne" punkty (odroznione drugim akcentem od lime
-   punktow dodawanych przez uzytkownika), pulsuja ciagle - maja byc widoczne
-   jako "zywe" nawet bez interakcji. */
+/* Boje - stale, pulsujace punkty "live" - ten sam zielony akcent co reszta
+   aktywnych/zywych elementow apki (dopasowane do wlaczonego przelacznika). */
 .buoy-marker {
   position: relative;
   width: 30px;
   height: 30px;
   border-radius: 50%;
   background: var(--accent-ink);
-  border: 2px solid var(--accent-2);
+  border: 2px solid var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -778,7 +780,7 @@ body {
   position: absolute;
   inset: -6px;
   border-radius: 50%;
-  border: 2px solid var(--accent-2);
+  border: 2px solid var(--accent);
   animation: pin-ping 2.4s ease-out infinite;
   pointer-events: none;
 }
@@ -786,7 +788,7 @@ body {
 .buoy-marker-icon {
   width: 15px;
   height: 15px;
-  color: var(--accent-2);
+  color: var(--accent);
 }
 
 .buoy-marker-icon svg {
@@ -859,6 +861,33 @@ body {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: 20px 22px 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.buoy-panel-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.buoy-panel-handle:active {
+  cursor: grabbing;
+}
+
+/* Panel boi - w odroznieniu od ChartModal NIE ma tla blokujacego reszte
+   strony: dokuje sie z boku mapy, zeby dalo sie w tym samym czasie
+   sterowac panelem bocznym (np. wlaczyc animacje czasu). */
+.buoy-panel {
+  position: fixed;
+  top: 76px;
+  right: 14px;
+  z-index: 900;
+  width: min(340px, calc(100vw - 28px));
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
@@ -943,12 +972,20 @@ body {
 /* "Podgląd strumienia danych" - wzorowane na sekcji z bentos.info (patrz
    BuoyModal.jsx), ale jawnie podpisane jako symulacja, nie "LIVE". */
 .stream-eyebrow {
+  margin-bottom: 8px;
+}
+
+.stream-eyebrow-highlight {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 1px 8px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+  font-weight: 700;
 }
 
 .buoy-stream {
@@ -980,7 +1017,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-2);
+  background: var(--accent);
   animation: alpha-blink 1.8s ease-in-out infinite;
 }
 
@@ -1038,7 +1075,7 @@ body {
 .buoy-stat-bar-fill {
   display: block;
   height: 100%;
-  background: var(--accent-2);
+  background: var(--accent);
   border-radius: var(--radius-full);
 }
 
