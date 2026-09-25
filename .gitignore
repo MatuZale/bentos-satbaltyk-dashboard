@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Surowe eksporty SatBałtyk (GeoTIFF, ~1GB+) - zostają tylko lokalnie.
+# public/data/ (wygenerowane PNG/f32/manifest, ~20MB) JEST commitowane -
+# to jedyne dane, których potrzebuje działający dashboard.
+dane/
