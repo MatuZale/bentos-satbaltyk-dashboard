@@ -3,11 +3,13 @@ import MapView from "./components/MapView";
 import Sidebar from "./components/Sidebar";
 import TimeControl from "./components/TimeControl";
 import Legend from "./components/Legend";
-import { getGrid, sampleGrid, findNearestIndex, degToCompass } from "./utils/grid";
+import PointsPanel from "./components/PointsPanel";
+import { getGrid, sampleGrid, findNearestIndex, formatProductValue } from "./utils/grid";
 import "./App.css";
 
 const PLAY_INTERVAL_MS = 700;
 const MANIFEST_POLL_MS = 20000; // odswieza katalog warstw co 20s - nowe dane wrzucone do dane/ pojawia sie same
+const MAX_PINS = 10; // powyzej tego liczba punktow na liscie robi sie nieczytelna - najstarszy odpada
 
 // Manifest trzyma sciezki wzgledne ("data/sst/xxx.png") - trzeba je doklejac
 // do BASE_URL (na GitHub Pages to "/nazwa-repo/", lokalnie "/"), zeby dzialaly
@@ -27,6 +29,10 @@ function resolveManifestUrls(manifest) {
   return { ...manifest, products };
 }
 
+function makePinId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export default function App() {
   const [manifest, setManifest] = useState(null);
   const [error, setError] = useState(null);
@@ -35,6 +41,8 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [gridData, setGridData] = useState(null);
   const [hover, setHover] = useState(null); // { lat, lon, value } | null
+  const [pins, setPins] = useState([]); // [{ id, lat, lon }]
+  const [pinMode, setPinMode] = useState(false); // czy klik na mapie dodaje punkt (jawnie wlaczane przyciskiem)
 
   function loadManifest(isFirstLoad) {
     return fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
@@ -73,7 +81,7 @@ export default function App() {
   const entries = manifest?.products[product]?.timestamps ?? [];
   const currentEntry = entries[index];
 
-  // Ladowanie siatki wartosci dla aktualnej warstwy (do odczytu pod kursorem)
+  // Ladowanie siatki wartosci dla aktualnej warstwy (do odczytu pod kursorem i w punktach)
   useEffect(() => {
     if (!currentEntry) return;
     let cancelled = false;
@@ -118,6 +126,17 @@ export default function App() {
     setHover({ lat, lon, value });
   }
 
+  function handleAddPin(lat, lon) {
+    setPins((prev) => {
+      const next = [...prev, { id: makePinId(), lat, lon }];
+      return next.length > MAX_PINS ? next.slice(next.length - MAX_PINS) : next;
+    });
+  }
+
+  function handleRemovePin(id) {
+    setPins((prev) => prev.filter((p) => p.id !== id));
+  }
+
   if (error) {
     return (
       <div className="state-message">
@@ -131,6 +150,11 @@ export default function App() {
   }
 
   const activeProduct = manifest.products[product];
+  const hoverLabel = hover ? (formatProductValue(activeProduct, hover.value) ?? "brak danych") : null;
+  const pointsWithValues = pins.map((p) => {
+    const value = gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, p.lat, p.lon) : null;
+    return { ...p, label: formatProductValue(activeProduct, value) };
+  });
 
   return (
     <div className="layout">
@@ -160,29 +184,38 @@ export default function App() {
           />
         </section>
 
-        <section className="panel readout">
-          <h2>Wartość pod kursorem</h2>
-          {hover && hover.value != null ? (
-            <p className="readout-value">
-              {activeProduct.circular
-                ? `${hover.value.toFixed(0)}° (${degToCompass(hover.value)})`
-                : `${hover.value.toFixed(2)} ${activeProduct.unit}`}
-            </p>
-          ) : (
-            <p className="readout-value readout-empty">
-              {hover ? "brak danych (ląd / poza zasięgiem)" : "najedź na mapę"}
-            </p>
-          )}
-        </section>
+        <PointsPanel
+          points={pointsWithValues}
+          pinMode={pinMode}
+          onTogglePinMode={() => setPinMode((v) => !v)}
+          onRemove={handleRemovePin}
+          onClear={() => setPins([])}
+        />
 
         <footer className="sidebar-footer">
-          Dane: SatBałtyk (satbaltyk.pl) · wygenerowano{" "}
-          {new Date(manifest.generated_at).toLocaleString("pl-PL")}
+          Dane: SatBałtyk (satbaltyk.pl) · wygenerowano {new Date(manifest.generated_at).toLocaleString("pl-PL")}
+          <br />
+          Część projektu{" "}
+          <a href="https://bentos.info" target="_blank" rel="noreferrer">
+            Bentos
+          </a>{" "}
+          — dofinansowanego ze środków Funduszy Europejskich dla Pomorza, Unii Europejskiej oraz Urzędu
+          Marszałkowskiego Województwa Pomorskiego.
         </footer>
       </aside>
 
       <main className="map-wrap">
-        <MapView bbox={manifest.bbox} imageUrl={currentEntry?.png} onHover={handleHover} />
+        <MapView
+          bbox={manifest.bbox}
+          imageUrl={currentEntry?.png}
+          productKey={product}
+          hoverLabel={hoverLabel}
+          pins={pins}
+          pinMode={pinMode}
+          onHover={handleHover}
+          onPinClick={handleRemovePin}
+          onMapClick={handleAddPin}
+        />
       </main>
     </div>
   );

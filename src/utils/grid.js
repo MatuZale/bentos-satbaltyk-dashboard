@@ -50,6 +50,15 @@ export function degToCompass(deg) {
   return COMPASS[idx];
 }
 
+// Formatuje odczyt wartosci dla danego produktu - wspolne dla celownika na
+// mapie i listy przypietych punktow, zeby oba miejsca pokazywaly to samo.
+export function formatProductValue(product, value) {
+  if (value == null) return null;
+  return product.circular
+    ? `${value.toFixed(0)}° (${degToCompass(value)})`
+    : `${value.toFixed(2)} ${product.unit}`;
+}
+
 export function formatTimestamp(iso) {
   const date = new Date(iso);
   return new Intl.DateTimeFormat("pl-PL", {

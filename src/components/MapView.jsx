@@ -1,20 +1,60 @@
-import { MapContainer, TileLayer, ImageOverlay, useMapEvents } from "react-leaflet";
-import { useMemo } from "react";
+import { MapContainer, TileLayer, ImageOverlay, Marker, useMapEvents } from "react-leaflet";
+import { useMemo, useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { PRODUCT_ICONS } from "./icons";
 
-function HoverLayer({ onHover }) {
+const PIN_LETTERS = "ABCDEFGHIJ";
+
+function buildPinIcon(Icon, letter) {
+  const html = renderToStaticMarkup(
+    <div className="pin-marker">
+      <span className="pin-marker-icon">
+        <Icon />
+      </span>
+      <span className="pin-marker-letter">{letter}</span>
+    </div>
+  );
+  return L.divIcon({
+    html,
+    className: "pin-marker-wrap",
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+}
+
+// Jeden nasluch zdarzen mapy: mousemove karmi "celownik" (pozycja w pikselach
+// kontenera + wartosc pod kursorem zamiast golego kursora), klik dodaje/usuwa
+// przypiety punkt. Nie renderuje nic sam - stan wystawia do rodzica.
+function MapInteractions({ onCursorMove, onHover, onMapClick }) {
   useMapEvents({
     mousemove(e) {
+      onCursorMove(e.containerPoint);
       onHover(e.latlng.lat, e.latlng.lng);
     },
     mouseout() {
+      onCursorMove(null);
       onHover(null, null);
+    },
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });
   return null;
 }
 
-export default function MapView({ bbox, imageUrl, onHover }) {
+export default function MapView({
+  bbox,
+  imageUrl,
+  productKey,
+  hoverLabel,
+  pins,
+  pinMode,
+  onHover,
+  onPinClick,
+  onMapClick,
+}) {
   const bounds = useMemo(() => {
     const [lonMin, latMin, lonMax, latMax] = bbox;
     return [
@@ -23,13 +63,21 @@ export default function MapView({ bbox, imageUrl, onHover }) {
     ];
   }, [bbox]);
 
+  const [cursor, setCursor] = useState(null); // {x,y} w pikselach kontenera mapy
+  const Icon = PRODUCT_ICONS[productKey];
+
+  const pinIcons = useMemo(
+    () => pins.map((_, i) => buildPinIcon(PRODUCT_ICONS[productKey], PIN_LETTERS[i] ?? "?")),
+    [pins, productKey]
+  );
+
   return (
     <MapContainer
       center={[54.5, 18.7]}
       zoom={10}
       minZoom={7}
       maxZoom={13}
-      className="map"
+      className={`map${pinMode ? " map-armed" : ""}`}
       preferCanvas
     >
       {/* Standardowe kafle OSM przyciemnione filtrem CSS (patrz .map .leaflet-tile-pane w App.css) -
@@ -40,7 +88,37 @@ export default function MapView({ bbox, imageUrl, onHover }) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       {imageUrl && <ImageOverlay url={imageUrl} bounds={bounds} opacity={0.88} />}
-      <HoverLayer onHover={onHover} />
+
+      {pins.map((p, i) => (
+        <Marker
+          key={p.id}
+          position={[p.lat, p.lon]}
+          icon={pinIcons[i]}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
+              onPinClick(p.id);
+            },
+          }}
+        />
+      ))}
+
+      <MapInteractions
+        onCursorMove={setCursor}
+        onHover={onHover}
+        onMapClick={pinMode ? onMapClick : () => {}}
+      />
+
+      {pinMode && <div className="pin-mode-hint">Kliknij na mapę, aby dodać punkt pomiarowy</div>}
+
+      {cursor && (
+        <div className="measure-cursor" style={{ left: cursor.x, top: cursor.y }}>
+          <span className="measure-cursor-dot">
+            <Icon />
+          </span>
+          {hoverLabel && <span className="measure-cursor-label">{hoverLabel}</span>}
+        </div>
+      )}
     </MapContainer>
   );
 }
