@@ -147,6 +147,21 @@ def warp_to_grid(src_path: Path) -> np.ndarray:
     return arr
 
 
+FEATHER_PX = 16  # ile pikseli od brzegu siatki zanika przezroczystosc
+
+
+def feather_alpha(alpha: np.ndarray) -> np.ndarray:
+    """Wygasza kanal alpha w pasie FEATHER_PX od kazdej krawedzi siatki -
+    zeby prostokat danych nie wygladal jak twardo wyciety kwadrat na mapie,
+    tylko naturalnie zanikal ku brzegom obszaru objetego danymi."""
+    h, w = alpha.shape
+    y = np.arange(h)[:, None]
+    x = np.arange(w)[None, :]
+    dist_edge = np.minimum(np.minimum(y, h - 1 - y), np.minimum(x, w - 1 - x))
+    fade = np.clip(dist_edge / FEATHER_PX, 0, 1)
+    return (alpha.astype(np.float32) * fade).astype(np.uint8)
+
+
 def colorize(arr: np.ndarray, cfg: dict) -> Image.Image:
     valid = ~np.isnan(arr)
     norm = mcolors.Normalize(vmin=cfg["vmin"], vmax=cfg["vmax"], clip=True)
@@ -154,6 +169,7 @@ def colorize(arr: np.ndarray, cfg: dict) -> Image.Image:
     rgba = colormap(norm(np.nan_to_num(arr, nan=cfg["vmin"])))
     rgba = (rgba * 255).astype(np.uint8)
     rgba[..., 3] = np.where(valid, 255, 0)
+    rgba[..., 3] = feather_alpha(rgba[..., 3])
     return Image.fromarray(rgba, mode="RGBA")
 
 

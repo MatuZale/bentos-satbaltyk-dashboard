@@ -20,36 +20,57 @@ export default function BuoyModal({ buoy, timestampIso, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
-    function onMove(e) {
-      if (!dragRef.current.dragging) return;
+    function moveTo(clientX, clientY) {
       const panelRect = panelRef.current.getBoundingClientRect();
       const mapEl = document.querySelector(".map-wrap");
       const bounds = mapEl
         ? mapEl.getBoundingClientRect()
         : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
 
-      let x = e.clientX - dragRef.current.offsetX;
-      let y = e.clientY - dragRef.current.offsetY;
+      let x = clientX - dragRef.current.offsetX;
+      let y = clientY - dragRef.current.offsetY;
       // nie pozwalamy wyciagnac panelu poza widoczny obszar mapy
       x = Math.min(Math.max(x, bounds.left), Math.max(bounds.left, bounds.right - panelRect.width));
       y = Math.min(Math.max(y, bounds.top), Math.max(bounds.top, bounds.bottom - panelRect.height));
       setPos({ x, y });
     }
+    function onMouseMove(e) {
+      if (!dragRef.current.dragging) return;
+      moveTo(e.clientX, e.clientY);
+    }
+    function onTouchMove(e) {
+      if (!dragRef.current.dragging) return;
+      const t = e.touches[0];
+      if (t) moveTo(t.clientX, t.clientY);
+    }
     function onUp() {
       dragRef.current.dragging = false;
     }
-    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onUp);
     return () => {
-      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onUp);
     };
   }, []);
 
-  function handleDragStart(e) {
+  function startDragAt(clientX, clientY) {
     const rect = panelRef.current.getBoundingClientRect();
-    dragRef.current = { dragging: true, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
+    dragRef.current = { dragging: true, offsetX: clientX - rect.left, offsetY: clientY - rect.top };
+  }
+
+  function handleDragStart(e) {
+    startDragAt(e.clientX, e.clientY);
     e.preventDefault();
+  }
+
+  function handleTouchDragStart(e) {
+    const t = e.touches[0];
+    if (t) startDragAt(t.clientX, t.clientY);
   }
 
   const r = simulateBuoyReading(buoy.id, timestampIso);
@@ -84,7 +105,11 @@ export default function BuoyModal({ buoy, timestampIso, onClose }) {
       ref={panelRef}
       style={pos ? { left: pos.x, top: pos.y, right: "auto" } : undefined}
     >
-      <div className="modal-header buoy-panel-handle" onMouseDown={handleDragStart}>
+      <div
+        className="modal-header buoy-panel-handle"
+        onMouseDown={handleDragStart}
+        onTouchStart={handleTouchDragStart}
+      >
         <div>
           <span className="modal-title">Boja „{buoy.name}”</span>
           <span className="buoy-sim-tag">symulacja</span>

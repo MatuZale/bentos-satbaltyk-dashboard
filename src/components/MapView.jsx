@@ -81,6 +81,19 @@ export default function MapView({
     ];
   }, [bbox]);
 
+  // Nieco szersze niz same dane granice panoramowania - widac odrobine
+  // kontekstu wokol obszaru zainteresowania, ale nie da sie "zgubic" gdzies
+  // w otwartym Baltyku daleko od Trojmiasta.
+  const maxBounds = useMemo(() => {
+    const [lonMin, latMin, lonMax, latMax] = bbox;
+    const padLon = (lonMax - lonMin) * 0.3;
+    const padLat = (latMax - latMin) * 0.3;
+    return [
+      [latMin - padLat, lonMin - padLon],
+      [latMax + padLat, lonMax + padLon],
+    ];
+  }, [bbox]);
+
   const [cursor, setCursor] = useState(null); // {x,y} w pikselach kontenera mapy
   const Icon = PRODUCT_ICONS[productKey];
 
@@ -93,8 +106,10 @@ export default function MapView({
     <MapContainer
       center={[54.5, 18.7]}
       zoom={10}
-      minZoom={7}
+      minZoom={8}
       maxZoom={13}
+      maxBounds={maxBounds}
+      maxBoundsViscosity={1.0}
       className={`map${pinMode ? " map-armed" : ""}`}
       preferCanvas
     >

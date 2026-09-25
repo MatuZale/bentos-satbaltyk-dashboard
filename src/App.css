@@ -97,6 +97,10 @@ body {
   color: var(--text-primary);
 }
 
+.sidebar-toggle-label {
+  display: none;
+}
+
 .layout.sidebar-collapsed .sidebar-toggle {
   left: 0;
 }
@@ -1277,18 +1281,90 @@ body {
 }
 
 @media (max-width: 720px) {
-  .layout {
-    flex-direction: column;
-  }
+  /* Na telefonie mapa jest domyslnie pelnoekranowa - panel to wysuwana
+     "szuflada" na cala wysokosc, wywolywana przyciskiem, a nie stale
+     wciskana kolumna 55vh (przy dzisiejszej ilosci sekcji nic by sie nie
+     miescilo). */
   .sidebar {
+    position: fixed;
+    inset: 0;
     width: 100%;
     min-width: 0;
-    max-height: 55vh;
+    max-height: none;
+    z-index: 950;
+    transform: translateY(0);
+    transition: transform 0.25s ease;
+    /* Szuflada ma cala wysokosc ekranu, wiec (w odroznieniu od waskiego
+       panelu na desktopie) po prostu przewija sie w calosci - nie trzeba
+       sciskac sekcji, zeby wszystko zmiescilo sie bez scrolla. */
+    overflow-y: auto;
+    padding-bottom: 70px; /* miejsce na pluwajacy przycisk "Zamknij" */
+  }
+
+  .points-panel {
+    flex: none;
+    overflow: visible;
+  }
+
+  .points-list {
+    overflow-y: visible;
+    max-height: none;
   }
   .sidebar.is-collapsed {
-    max-height: 0;
+    transform: translateY(100%);
   }
-  .sidebar-toggle {
+
+  .sidebar-toggle,
+  .layout.sidebar-collapsed .sidebar-toggle {
+    position: fixed;
+    top: auto;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    width: auto;
+    height: auto;
+    padding: 11px 20px;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+    font-size: 13px;
+    gap: 6px;
+    z-index: 970;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .sidebar-toggle-chevron {
     display: none;
+  }
+
+  .sidebar-toggle-label {
+    display: inline;
+  }
+
+  .brand-badge {
+    padding: 8px 10px;
+  }
+
+  .brand-badge-logo {
+    height: 22px;
+  }
+
+  .brand-badge-location {
+    font-size: 9px;
+  }
+
+  .alpha-badge {
+    max-width: calc(100vw - 28px);
+    bottom: 70px; /* nad przyciskiem "Warstwy", zeby sie nie zachodzily */
+  }
+
+  .buoy-panel {
+    left: 14px;
+    right: 14px;
+    width: auto;
+    top: 90px;
+    max-height: calc(100vh - 130px);
   }
 }

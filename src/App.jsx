@@ -48,7 +48,11 @@ export default function App() {
   const [pins, setPins] = useState([]); // [{ id, lat, lon }]
   const [pinMode, setPinMode] = useState(false); // czy klik na mapie dodaje punkt (jawnie wlaczane przyciskiem)
   const [chartPinId, setChartPinId] = useState(null); // ktory punkt ma otwarty wykres w czasie
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Na telefonie startujemy z ukrytym panelem (mapa na caly ekran) - na
+  // desktopie/tablecie panel jest domyslnie widoczny.
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth > 720
+  );
   const [buoysVisible, setBuoysVisible] = useState(true);
   const [openBuoyId, setOpenBuoyId] = useState(null);
 
@@ -237,7 +241,8 @@ export default function App() {
         onClick={() => setSidebarOpen((v) => !v)}
         aria-label={sidebarOpen ? "Schowaj panel" : "Pokaż panel"}
       >
-        {sidebarOpen ? "‹" : "›"}
+        <span className="sidebar-toggle-chevron">{sidebarOpen ? "‹" : "›"}</span>
+        <span className="sidebar-toggle-label">{sidebarOpen ? "Zamknij" : "☰ Warstwy"}</span>
       </button>
 
       <main className="map-wrap">
