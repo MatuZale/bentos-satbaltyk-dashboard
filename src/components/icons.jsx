@@ -45,6 +45,16 @@ export function CompassIcon() {
   );
 }
 
+export function BuoyIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="7.5" />
+      <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+    </svg>
+  );
+}
+
 export const PRODUCT_ICONS = {
   sst: ThermometerIcon,
   chla: DropletIcon,

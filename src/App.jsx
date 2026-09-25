@@ -5,6 +5,8 @@ import TimeControl from "./components/TimeControl";
 import Legend from "./components/Legend";
 import PointsPanel from "./components/PointsPanel";
 import ChartModal from "./components/ChartModal";
+import BuoyModal from "./components/BuoyModal";
+import { BUOYS } from "./data/buoys";
 import { getGrid, sampleGrid, findNearestIndex, formatProductValue } from "./utils/grid";
 import "./App.css";
 
@@ -41,11 +43,13 @@ export default function App() {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [gridData, setGridData] = useState(null);
-  const [hover, setHover] = useState(null); // { lat, lon, value } | null
+  const [hoverLatLng, setHoverLatLng] = useState(null); // { lat, lon } | null - tylko pozycja kursora
   const [pins, setPins] = useState([]); // [{ id, lat, lon }]
   const [pinMode, setPinMode] = useState(false); // czy klik na mapie dodaje punkt (jawnie wlaczane przyciskiem)
   const [chartPinId, setChartPinId] = useState(null); // ktory punkt ma otwarty wykres w czasie
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [buoysVisible, setBuoysVisible] = useState(true);
+  const [openBuoyId, setOpenBuoyId] = useState(null);
 
   function loadManifest(isFirstLoad) {
     return fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
@@ -122,12 +126,7 @@ export default function App() {
   }
 
   function handleHover(lat, lon) {
-    if (lat == null || !gridData || !manifest) {
-      setHover(null);
-      return;
-    }
-    const value = sampleGrid(gridData, manifest.grid, manifest.bbox, lat, lon);
-    setHover({ lat, lon, value });
+    setHoverLatLng(lat == null ? null : { lat, lon });
   }
 
   function handleAddPin(lat, lon) {
@@ -155,7 +154,9 @@ export default function App() {
   }
 
   const activeProduct = manifest.products[product];
-  const hoverLabel = hover ? (formatProductValue(activeProduct, hover.value) ?? "brak danych") : null;
+  const hoverValue =
+    hoverLatLng && gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, hoverLatLng.lat, hoverLatLng.lon) : null;
+  const hoverLabel = hoverLatLng ? (formatProductValue(activeProduct, hoverValue) ?? "brak danych") : null;
   const pointsWithValues = pins.map((p) => {
     const value = gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, p.lat, p.lon) : null;
     return { ...p, label: formatProductValue(activeProduct, value) };
@@ -181,6 +182,23 @@ export default function App() {
           />
         </section>
 
+        <section className="panel buoys-toggle-panel">
+          <div className="switch-row">
+            <span className="switch-label">
+              Boje pomiarowe
+              <span className="buoy-sim-tag">symulacja</span>
+            </span>
+            <button
+              className={`switch${buoysVisible ? " is-on" : ""}`}
+              role="switch"
+              aria-checked={buoysVisible}
+              onClick={() => setBuoysVisible((v) => !v)}
+            >
+              <span className="switch-thumb" />
+            </button>
+          </div>
+        </section>
+
         <PointsPanel
           points={pointsWithValues}
           pinMode={pinMode}
@@ -202,6 +220,7 @@ export default function App() {
           </a>{" "}
           — dofinansowanego ze środków Funduszy Europejskich dla Pomorza, Unii Europejskiej oraz Urzędu
           Marszałkowskiego Województwa Pomorskiego.
+          <div className="sidebar-footer-legal">© 2026 BENTOS · EmbeddedSystems.do × IOPAN</div>
         </footer>
       </aside>
 
@@ -233,9 +252,11 @@ export default function App() {
           hoverLabel={hoverLabel}
           pins={pins}
           pinMode={pinMode}
+          buoysVisible={buoysVisible}
           onHover={handleHover}
           onPinClick={handleRemovePin}
           onMapClick={handleAddPin}
+          onBuoyClick={setOpenBuoyId}
         />
       </main>
 
@@ -254,6 +275,13 @@ export default function App() {
               onClose={() => setChartPinId(null)}
             />
           );
+        })()}
+
+      {openBuoyId &&
+        (() => {
+          const buoy = BUOYS.find((b) => b.id === openBuoyId);
+          if (!buoy) return null;
+          return <BuoyModal buoy={buoy} timestampIso={currentEntry?.t} onClose={() => setOpenBuoyId(null)} />;
         })()}
     </div>
   );

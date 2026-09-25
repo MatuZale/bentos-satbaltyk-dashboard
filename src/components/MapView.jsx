@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { PRODUCT_ICONS } from "./icons";
+import { PRODUCT_ICONS, BuoyIcon } from "./icons";
+import { BUOYS } from "../data/buoys";
 
 const PIN_LETTERS = "ABCDEFGHIJ";
 
@@ -24,6 +25,20 @@ function buildPinIcon(Icon, letter) {
     iconAnchor: [15, 15],
   });
 }
+
+const BUOY_ICON = L.divIcon({
+  html: renderToStaticMarkup(
+    <div className="buoy-marker">
+      <span className="buoy-marker-ring" />
+      <span className="buoy-marker-icon">
+        <BuoyIcon />
+      </span>
+    </div>
+  ),
+  className: "pin-marker-wrap",
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+});
 
 // Jeden nasluch zdarzen mapy: mousemove karmi "celownik" (pozycja w pikselach
 // kontenera + wartosc pod kursorem zamiast golego kursora), klik dodaje/usuwa
@@ -52,9 +67,11 @@ export default function MapView({
   hoverLabel,
   pins,
   pinMode,
+  buoysVisible,
   onHover,
   onPinClick,
   onMapClick,
+  onBuoyClick,
 }) {
   const bounds = useMemo(() => {
     const [lonMin, latMin, lonMax, latMax] = bbox;
@@ -103,6 +120,21 @@ export default function MapView({
           }}
         />
       ))}
+
+      {buoysVisible &&
+        BUOYS.map((b) => (
+          <Marker
+            key={b.id}
+            position={[b.lat, b.lon]}
+            icon={BUOY_ICON}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+                onBuoyClick(b.id);
+              },
+            }}
+          />
+        ))}
 
       <MapInteractions
         onCursorMove={setCursor}

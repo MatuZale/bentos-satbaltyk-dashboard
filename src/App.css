@@ -14,6 +14,10 @@
   --accent: #aaff00;
   --accent-ink: #001562;
   --accent-dim: rgba(170, 255, 0, 0.14);
+  /* Drugi akcent (z niewykorzystanego tokenu --primary #0036ff na bentos.info)
+     do odroznienia "oficjalnych" boi od punktow dodawanych przez uzytkownika. */
+  --accent-2: #3b6bff;
+  --accent-2-dim: rgba(59, 107, 255, 0.18);
   --font-sans: "Open Sauce Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --radius-lg: 20px;
@@ -388,6 +392,72 @@ body {
   color: var(--accent-ink);
 }
 
+/* Panel wlacz/wylacz boi - sekcja stala (flex:none), nie rosnie/nie scrolluje sie */
+.buoys-toggle-panel {
+  flex: none;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.switch-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.buoy-sim-tag {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.switch {
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: left 0.15s ease, background 0.15s ease;
+}
+
+.switch.is-on {
+  background: var(--accent-2-dim);
+  border-color: var(--accent-2);
+}
+
+.switch.is-on .switch-thumb {
+  left: 18px;
+  background: var(--accent-2);
+}
+
 .points-empty {
   flex: none;
   margin: 0;
@@ -535,6 +605,13 @@ body {
   text-decoration: underline;
 }
 
+.sidebar-footer-legal {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  opacity: 0.8;
+}
+
 .map-wrap {
   flex: 1;
   position: relative;
@@ -676,6 +753,47 @@ body {
   justify-content: center;
 }
 
+/* Boje - stale, "oficjalne" punkty (odroznione drugim akcentem od lime
+   punktow dodawanych przez uzytkownika), pulsuja ciagle - maja byc widoczne
+   jako "zywe" nawet bez interakcji. */
+.buoy-marker {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-ink);
+  border: 2px solid var(--accent-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.buoy-marker:hover {
+  transform: scale(1.12);
+}
+
+.buoy-marker-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-2);
+  animation: pin-ping 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+.buoy-marker-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--accent-2);
+}
+
+.buoy-marker-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 /* "Ubogiego dark mode" dla standardowych kafli OSM - odwrocenie barw + korekta
    odcienia/jasnosci. Dziala tylko na warstwie kafli (leaflet-tile-pane), wiec
    nakladka z danymi (leaflet-overlay-pane) zachowuje swoje wlasciwe kolory. */
@@ -790,6 +908,154 @@ body {
 .modal-close:hover {
   color: var(--text-primary);
   border-color: var(--border-strong);
+}
+
+/* "Kamera" boi - generowana scena SVG (nie prawdziwe zdjecie), z belka OSD
+   jak w przemyslowej kamerze, zeby bylo jasne ze to symulacja. */
+.buoy-camera {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.buoy-camera-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.buoy-camera-osd {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* "Podgląd strumienia danych" - wzorowane na sekcji z bentos.info (patrz
+   BuoyModal.jsx), ale jawnie podpisane jako symulacja, nie "LIVE". */
+.stream-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.buoy-stream {
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.buoy-stream-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.buoy-stream-live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.buoy-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  animation: alpha-blink 1.8s ease-in-out infinite;
+}
+
+.buoy-stream-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.buoy-telemetry {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.buoy-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.buoy-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.buoy-stat-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.buoy-stat-value small {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.buoy-stat-bar {
+  display: block;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.buoy-stat-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent-2);
+  border-radius: var(--radius-full);
+}
+
+.buoy-stream-footer {
+  margin-top: 10px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.buoy-disclaimer {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .chart-status {
