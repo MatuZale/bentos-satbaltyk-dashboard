@@ -144,3 +144,10 @@ src/                          aplikacja React
   components/Legend.jsx       pasek skali kolorów
   utils/grid.js                odczyt siatki f32, formatowanie czasu/kompasu
 ```
+
+## Licencja
+
+Kod tego repozytorium jest na licencji [MIT](LICENSE). Nie obejmuje to logo
+Bentos (`public/brand/bentos-logo.png`, własność projektu bentos.info) ani
+danych pochodnych z SatBałtyk (`public/data/`, podlegają warunkom
+satbaltyk.pl) — szczegóły w pliku LICENSE.
