@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MapView from "./components/MapView";
 import Sidebar from "./components/Sidebar";
+import SidebarWater from "./components/SidebarWater";
 import TimeControl from "./components/TimeControl";
 import Legend from "./components/Legend";
 import PointsPanel from "./components/PointsPanel";
@@ -116,42 +117,46 @@ export default function App() {
   const [signalGrids, setSignalGrids] = useState({});
   const [signalsOpen, setSignalsOpen] = useState(true);
 
-  function loadManifest(isFirstLoad) {
-    return fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`manifest.json: HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((raw) => {
-        const m = resolveManifestUrls(raw);
-        setManifest((prev) => {
-          if (isFirstLoad || !prev) {
-            const timestamps = m.products.sst?.timestamps ?? [];
-            setIndex(Math.max(0, timestamps.length - 1));
-            return m;
-          }
-          // dotarly nowe dane w tle - zostajemy przy tym samym produkcie/momencie w czasie
-          if (prev.generated_at !== m.generated_at) {
-            const nextEntries = m.products[product]?.timestamps ?? [];
-            const currentT = prev.products[product]?.timestamps[index]?.t;
-            setIndex(findNearestIndex(nextEntries, currentT));
-            return m;
-          }
-          return prev;
-        });
-      })
-      .catch((e) => setError(e.message));
-  }
-
-  useEffect(() => {
-    loadManifest(true);
-    const id = setInterval(() => loadManifest(false), MANIFEST_POLL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const entries = manifest?.products[product]?.timestamps ?? [];
   const currentEntry = entries[index];
+
+  // Polling zyje przez caly czas zycia komponentu, wiec aktualny widok czyta
+  // z refa - inaczej widzialby wartosci z pierwszego renderu.
+  const viewRef = useRef({});
+  viewRef.current = { product, t: currentEntry?.t, generatedAt: manifest?.generated_at };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function loadManifest(isFirstLoad) {
+      fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`manifest.json: HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((raw) => {
+          const view = viewRef.current;
+          if (cancelled || raw.generated_at === view.generatedAt) return;
+          // nowe dane w tle - zostajemy przy tym samym produkcie/momencie w czasie
+          // (przy pierwszym ladowaniu t == null, wiec wybierana jest najnowsza klatka)
+          const m = resolveManifestUrls(raw);
+          const nextEntries = m.products[view.product]?.timestamps ?? [];
+          setManifest(m);
+          setIndex(Math.max(0, findNearestIndex(nextEntries, view.t)));
+        })
+        .catch((e) => {
+          // nieudany polling w tle nie powinien zabijac dzialajacego widoku
+          if (isFirstLoad && !cancelled) setError(e.message);
+        });
+    }
+
+    loadManifest(true);
+    const id = setInterval(() => loadManifest(false), MANIFEST_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   // Ocena warunkow korzysta jednoczesnie z SST, chlorofilu i wysokosci fali,
   // niezaleznie od warstwy wybranej aktualnie w panelu bocznym.
@@ -162,8 +167,14 @@ export default function App() {
       .map((key) => [key, nearestEntryByTime(manifest.products[key]?.timestamps, currentEntry?.t)?.grid])
       .filter(([, url]) => url);
 
-    Promise.all(sources.map(async ([key, url]) => [key, await getGrid(url)])).then((loaded) => {
-      if (!cancelled) setSignalGrids(Object.fromEntries(loaded));
+    Promise.all(
+      sources.map(([key, url]) =>
+        getGrid(url)
+          .then((grid) => [key, grid])
+          .catch(() => null)
+      )
+    ).then((loaded) => {
+      if (!cancelled) setSignalGrids(Object.fromEntries(loaded.filter(Boolean)));
     });
     return () => {
       cancelled = true;
@@ -174,9 +185,13 @@ export default function App() {
   useEffect(() => {
     if (!currentEntry) return;
     let cancelled = false;
-    getGrid(currentEntry.grid).then((arr) => {
-      if (!cancelled) setGridData(arr);
-    });
+    getGrid(currentEntry.grid)
+      .then((arr) => {
+        if (!cancelled) setGridData(arr);
+      })
+      .catch(() => {
+        if (!cancelled) setGridData(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -186,7 +201,7 @@ export default function App() {
   useEffect(() => {
     if (!entries.length) return;
     const next = entries[(index + 1) % entries.length];
-    if (next) getGrid(next.grid);
+    if (next) getGrid(next.grid).catch(() => {});
   }, [entries, index]);
 
   // Animacja odtwarzania - predkosc ustawiana przez uzytkownika (patrz TimeControl)
@@ -211,15 +226,37 @@ export default function App() {
     setHoverLatLng(lat == null ? null : { lat, lon });
   }
 
+  function clearSelection() {
+    setSelectedPinId(null);
+    setSelectedBuoyId(null);
+    setOpenBuoyId(null);
+  }
+
+  function selectPin(id) {
+    clearSelection();
+    setSelectedPinId(id);
+  }
+
+  function selectBuoy(id) {
+    clearSelection();
+    setSelectedBuoyId(id);
+    setOpenBuoyId(id);
+  }
+
   function handleAddPin(lat, lon) {
     const id = makePinId();
     setPins((prev) => {
       const next = [...prev, { id, lat, lon }];
       return next.length > MAX_PINS ? next.slice(next.length - MAX_PINS) : next;
     });
-    setSelectedPinId(id);
-    setOpenBuoyId(null);
-    setSelectedBuoyId(null);
+    selectPin(id);
+  }
+
+  // Klik w puste miejsce mapy: w trybie dodawania stawia punkt, poza nim
+  // "wychodzi" z zaznaczenia - bez boi/punktu nie ma tez oceny warunkow.
+  function handleMapClick(lat, lon) {
+    if (pinMode) handleAddPin(lat, lon);
+    else clearSelection();
   }
 
   function handleRemovePin(id) {
@@ -256,12 +293,15 @@ export default function App() {
     ? t("signal.scopeBuoy", { name: selectedBuoy.name, place: language === "en" ? selectedBuoy.placeEn : selectedBuoy.place })
     : selectedPin
       ? t("signal.scopePoint", { letter: "ABCDEFGHIJ"[selectedPinIndex] ?? "?", lat: selectedPin.lat.toFixed(3), lon: selectedPin.lon.toFixed(3) })
-      : t("signal.scopeBaltic");
-  const publicSignals = buildPublicSignals(manifest, currentEntry?.t, signalLocation, signalGrids, t);
+      : null;
+  const publicSignals = signalLocation
+    ? buildPublicSignals(manifest, currentEntry?.t, signalLocation, signalGrids, t)
+    : [];
 
   return (
     <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}${signalsOpen ? "" : " signals-collapsed"}`}>
       <aside className={`sidebar${sidebarOpen ? "" : " is-collapsed"}`}>
+        <SidebarWater active={sidebarOpen} />
         <Sidebar products={manifest.products} activeProduct={product} onSelect={handleSelectProduct} />
 
         <section className="panel">
@@ -291,13 +331,14 @@ export default function App() {
               className={`switch${buoysVisible ? " is-on" : ""}`}
               role="switch"
               aria-checked={buoysVisible}
-              onClick={() =>
-                setBuoysVisible((v) => {
-                  if (v) setOpenBuoyId(null); // chowamy boje - zamykamy tez ewentualny otwarty panel
-                  if (v) setSelectedBuoyId(null);
-                  return !v;
-                })
-              }
+              onClick={() => {
+                // chowamy boje - zamykamy tez ewentualny otwarty panel
+                if (buoysVisible) {
+                  setOpenBuoyId(null);
+                  setSelectedBuoyId(null);
+                }
+                setBuoysVisible(!buoysVisible);
+              }}
             >
               <span className="switch-thumb" />
             </button>
@@ -315,15 +356,9 @@ export default function App() {
             setChartPinId(null);
             setSelectedPinId(null);
           }}
-          onSelect={(id) => {
-            setSelectedPinId(id);
-            setOpenBuoyId(null);
-            setSelectedBuoyId(null);
-          }}
+          onSelect={selectPin}
           onShowChart={(id) => {
-            setSelectedPinId(id);
-            setOpenBuoyId(null);
-            setSelectedBuoyId(null);
+            selectPin(id);
             setChartPinId(id);
           }}
         />
@@ -370,42 +405,44 @@ export default function App() {
           </div>
         </div>
 
-        {/* Ocena zostaje na ekranie tez przy otwartym panelu boi - od razu
-            przelacza sie na wybrana boje/punkt (key na zakresie odpala
-            krotkie podswietlenie, zeby bylo widac, ze sie przeliczyla). */}
-        <div
-          className={`public-signals${signalsOpen ? "" : " is-collapsed"}`}
-          aria-label={t("signal.aria")}
-        >
-          <div className="public-signals-head">
-            <span>{t("signal.title")}</span>
-            <div className="public-signals-head-actions">
-              <strong>{t("signal.demo")}</strong>
-              <button
-                className="public-signals-toggle"
-                onClick={() => setSignalsOpen((open) => !open)}
-                aria-expanded={signalsOpen}
-                aria-label={t(signalsOpen ? "signal.hide" : "signal.show")}
-                title={t(signalsOpen ? "signal.hide" : "signal.show")}
-              >
-                {signalsOpen ? "−" : "+"}
-              </button>
-            </div>
-          </div>
-          {signalsOpen && (
-            <>
-              <div className="public-signals-scope" title={signalScope}>{signalScope}</div>
-              <div className="public-signals-grid" key={signalScope}>
-                {publicSignals.map((signal) => (
-                  <div className={`public-signal is-${signal.tone}`} key={signal.label}>
-                    <span>{signal.label}</span>
-                    <strong>{signal.value}</strong>
-                  </div>
-                ))}
+        {/* Ocena pojawia sie tylko dla wybranej boi/punktu i zostaje tez przy
+            otwartym panelu boi (key na zakresie odpala krotkie podswietlenie,
+            zeby bylo widac, ze sie przeliczyla). */}
+        {signalLocation && (
+          <div
+            className={`public-signals${signalsOpen ? "" : " is-collapsed"}`}
+            aria-label={t("signal.aria")}
+          >
+            <div className="public-signals-head">
+              <span>{t("signal.title")}</span>
+              <div className="public-signals-head-actions">
+                <strong>{t("signal.demo")}</strong>
+                <button
+                  className="public-signals-toggle"
+                  onClick={() => setSignalsOpen((open) => !open)}
+                  aria-expanded={signalsOpen}
+                  aria-label={t(signalsOpen ? "signal.hide" : "signal.show")}
+                  title={t(signalsOpen ? "signal.hide" : "signal.show")}
+                >
+                  {signalsOpen ? "−" : "+"}
+                </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+            {signalsOpen && (
+              <>
+                <div className="public-signals-scope" title={signalScope}>{signalScope}</div>
+                <div className="public-signals-grid" key={signalScope}>
+                  {publicSignals.map((signal) => (
+                    <div className={`public-signal is-${signal.tone}`} key={signal.label}>
+                      <span>{signal.label}</span>
+                      <strong>{signal.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="alpha-badge">
           <span className="alpha-badge-dot" />
@@ -425,17 +462,9 @@ export default function App() {
           buoysVisible={buoysVisible}
           selectedBuoyId={selectedBuoyId}
           onHover={handleHover}
-          onPinClick={(id) => {
-            setSelectedPinId(id);
-            setOpenBuoyId(null);
-            setSelectedBuoyId(null);
-          }}
-          onMapClick={handleAddPin}
-          onBuoyClick={(id) => {
-            setSelectedPinId(null);
-            setSelectedBuoyId(id);
-            setOpenBuoyId(id);
-          }}
+          onPinClick={selectPin}
+          onMapClick={handleMapClick}
+          onBuoyClick={selectBuoy}
         />
       </main>
 

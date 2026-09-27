@@ -4,12 +4,15 @@ const gridCache = new Map();
 
 export function getGrid(url) {
   if (!gridCache.has(url)) {
-    gridCache.set(
-      url,
-      fetch(url)
-        .then((r) => r.arrayBuffer())
-        .then((buf) => new Float32Array(buf))
-    );
+    const promise = fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then((buf) => new Float32Array(buf));
+    // nieudane pobranie nie moze zostac w cache - kolejna proba ma szanse sie udac
+    promise.catch(() => gridCache.delete(url));
+    gridCache.set(url, promise);
   }
   return gridCache.get(url);
 }

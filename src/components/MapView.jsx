@@ -1,5 +1,5 @@
-import { MapContainer, TileLayer, ImageOverlay, Marker, useMapEvents } from "react-leaflet";
-import { useMemo, useState } from "react";
+import { MapContainer, TileLayer, ImageOverlay, Marker, useMap, useMapEvents } from "react-leaflet";
+import { useEffect, useMemo, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -65,6 +65,18 @@ function MapInteractions({ onCursorMove, onHover, onMapClick }) {
       onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+}
+
+// Leaflet sam sledzi tylko resize okna - chowanie panelu zmienia szerokosc
+// kontenera bez resize okna, wiec bez tego zostaje pusty pas bez kafli.
+function FitContainer() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
   return null;
 }
 
@@ -154,10 +166,12 @@ export default function MapView({
           />
         ))}
 
+      <FitContainer />
+
       <MapInteractions
         onCursorMove={setCursor}
         onHover={onHover}
-        onMapClick={pinMode ? onMapClick : () => {}}
+        onMapClick={onMapClick}
       />
 
       {pinMode && <div className="pin-mode-hint">{t("map.addHint")}</div>}

@@ -51,12 +51,11 @@ body {
 .sidebar {
   width: 340px;
   min-width: 340px;
-  /* Powierzchnia -> dno: jasny błękit u góry (światło przenika płycej),
-     gradient gasnący do prawie czarnego granatu (--bg-deep) w głębi -
-     symbolizuje spadek widoczności wraz z głębokością w Bałtyku. Delikatna
-     poświata w rogu = promienie słońca tuż pod taflą, bez użycia zdjęcia. */
-  background: radial-gradient(ellipse 480px 280px at 15% -8%, rgba(255, 255, 255, 0.1), transparent 60%),
-    linear-gradient(180deg, #1c6b82 0%, #103f5c 14%, #06213b 28%, #020c1e 44%, var(--bg-deep) 62%);
+  /* Pod animowaną taflą (SidebarWater) prosty gradient w kolorach hero
+     bentos.info: granatowy błękit #001562 gasnący w ciemną toń. */
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, #001562 0%, #00093d 55%, var(--bg) 100%);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -68,6 +67,73 @@ body {
   width: 0;
   min-width: 0;
   border-right-color: transparent;
+}
+
+/* Stała szerokość (a nie 100%), żeby przy animacji chowania panelu wideo
+   było przycinane, a nie przeskalowywane. z-index -1 w izolowanym kontekście
+   .sidebar = nad jego tłem, pod całą zawartością. */
+.sidebar-water {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 340px;
+  height: 460px;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+}
+
+.sidebar-water-video,
+.sidebar-water-tint,
+.sidebar-water-rays,
+.sidebar-water-particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-water-video {
+  object-fit: cover;
+  object-position: top center;
+}
+
+.sidebar-water-tint {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 21, 98, 0.35) 0%,
+    rgba(0, 21, 98, 0.6) 50%,
+    rgba(0, 21, 98, 0.92) 100%
+  );
+}
+
+.sidebar-water-rays {
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
+.sidebar-water-ray {
+  position: absolute;
+  top: -10%;
+  width: 14%;
+  height: 120%;
+  background: linear-gradient(rgba(255, 255, 255, 0.55), rgba(170, 220, 255, 0.25) 40%, transparent);
+  filter: blur(14px);
+  animation: sidebar-god-ray ease-in-out infinite;
+}
+
+@keyframes sidebar-god-ray {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateX(0) skewX(-12deg);
+  }
+  50% {
+    opacity: 0.45;
+    transform: translateX(14px) skewX(-10deg);
+  }
 }
 
 /* Zawsze widoczny uchwyt do chowania/pokazywania panelu - siedzi dokladnie
@@ -398,7 +464,8 @@ body {
   padding: 11px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: rgba(15, 28, 81, 0.72);
+  backdrop-filter: blur(6px);
   color: var(--text-secondary);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -889,9 +956,12 @@ body {
   opacity: 0.8;
 }
 
+/* isolation zamyka z-indeksy Leafleta (kontrolki = 1000) wewnątrz mapy, żeby
+   nie wychodziły nad szufladę panelu na telefonie (z-index 950). */
 .map-wrap {
   flex: 1;
   position: relative;
+  isolation: isolate;
 }
 
 .map {
@@ -1696,6 +1766,7 @@ body {
   .pin-marker,
   .sidebar,
   .sidebar-toggle,
+  .sidebar-water-ray,
   .alpha-badge-dot {
     animation: none !important;
     transition: none !important;
@@ -1721,6 +1792,10 @@ body {
        sciskac sekcji, zeby wszystko zmiescilo sie bez scrolla. */
     overflow-y: auto;
     padding-bottom: 70px; /* miejsce na pluwajacy przycisk "Zamknij" */
+  }
+
+  .sidebar-water {
+    width: 100%;
   }
 
   .points-panel {

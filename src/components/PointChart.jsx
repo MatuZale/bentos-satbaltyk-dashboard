@@ -34,9 +34,13 @@ export default function PointChart({ point, product, entries, grid, bbox }) {
   useEffect(() => {
     let cancelled = false;
     setSeries(null);
-    loadPointSeries(entries, grid, bbox, point.lat, point.lon).then((s) => {
-      if (!cancelled) setSeries(s);
-    });
+    loadPointSeries(entries, grid, bbox, point.lat, point.lon)
+      .then((s) => {
+        if (!cancelled) setSeries(s);
+      })
+      .catch(() => {
+        if (!cancelled) setSeries([]);
+      });
     return () => {
       cancelled = true;
     };

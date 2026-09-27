@@ -27,6 +27,9 @@ This license covers the source code of this project only. It does NOT cover:
 - The Bentos name and logo (`public/brand/bentos-logo.png`), which belong to
   the Bentos project (bentos.info) and are used here with attribution, not
   licensed for reuse.
+- The underwater footage (`public/brand/sidebar-water.mp4`,
+  `public/brand/sidebar-water.jpg`), cropped from the bentos.info hero video
+  and subject to the same terms as the Bentos brand assets above.
 - Data derived from SatBałtyk (satbaltyk.pl) under `public/data/`, which
   remains subject to SatBałtyk's own terms - check with satbaltyk.pl before
   reusing it elsewhere.
