@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, ImageOverlay, Marker, useMap, useMapEvents } from "react-leaflet";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -48,20 +48,42 @@ function buildBuoyIcon(isSelected) {
   });
 }
 
-// Jeden nasluch zdarzen mapy: mousemove karmi "celownik" (pozycja w pikselach
-// kontenera + wartosc pod kursorem zamiast golego kursora), klik dodaje/usuwa
-// przypiety punkt. Nie renderuje nic sam - stan wystawia do rodzica.
-function MapInteractions({ onCursorMove, onHover, onMapClick }) {
+// Jeden nasluch zdarzen mapy: mysz karmi "celownik" (pozycja w pikselach
+// kontenera + wartosc pod kursorem), klik dodaje punkt albo zdejmuje
+// zaznaczenie. Na dotyku przegladarka emuluje mousemove przy tapnieciu, a
+// mouseout nigdy nie przychodzi - celownik zostawalby na ekranie na zawsze,
+// wiec tam pokazujemy go tylko jako "sonde" po tapnieciu w pusta mape.
+function MapInteractions({ onProbe, onMapClick, hasSelection, pinMode }) {
+  const map = useMap();
+  const pointerTypeRef = useRef("mouse");
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const track = (e) => {
+      pointerTypeRef.current = e.pointerType;
+    };
+    container.addEventListener("pointerdown", track, true);
+    container.addEventListener("pointermove", track, true);
+    return () => {
+      container.removeEventListener("pointerdown", track, true);
+      container.removeEventListener("pointermove", track, true);
+    };
+  }, [map]);
+
+  const isMouse = () => pointerTypeRef.current === "mouse";
+
   useMapEvents({
     mousemove(e) {
-      onCursorMove(e.containerPoint);
-      onHover(e.latlng.lat, e.latlng.lng);
+      if (isMouse()) onProbe(e);
     },
     mouseout() {
-      onCursorMove(null);
-      onHover(null, null);
+      if (isMouse()) onProbe(null);
+    },
+    movestart() {
+      if (!isMouse()) onProbe(null);
     },
     click(e) {
+      if (!isMouse()) onProbe(pinMode || hasSelection ? null : e);
       onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });
@@ -107,6 +129,12 @@ export default function MapView({
   const [cursor, setCursor] = useState(null); // {x,y} w pikselach kontenera mapy
   const Icon = PRODUCT_ICONS[productKey];
 
+  function probe(e) {
+    setCursor(e ? e.containerPoint : null);
+    if (e) onHover(e.latlng.lat, e.latlng.lng);
+    else onHover(null, null);
+  }
+
   const pinIcons = useMemo(
     () => pins.map((pin, i) => buildPinIcon(PRODUCT_ICONS[productKey], PIN_LETTERS[i] ?? "?", pin.id === selectedPinId)),
     [pins, productKey, selectedPinId]
@@ -145,6 +173,7 @@ export default function MapView({
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
+              probe(null);
               onPinClick(p.id);
             },
           }}
@@ -160,6 +189,7 @@ export default function MapView({
             eventHandlers={{
               click: (e) => {
                 L.DomEvent.stopPropagation(e);
+                probe(null);
                 onBuoyClick(b.id);
               },
             }}
@@ -169,9 +199,10 @@ export default function MapView({
       <FitContainer />
 
       <MapInteractions
-        onCursorMove={setCursor}
-        onHover={onHover}
+        onProbe={probe}
         onMapClick={onMapClick}
+        hasSelection={Boolean(selectedBuoyId || selectedPinId)}
+        pinMode={pinMode}
       />
 
       {pinMode && <div className="pin-mode-hint">{t("map.addHint")}</div>}
