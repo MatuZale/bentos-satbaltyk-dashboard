@@ -1,8 +1,10 @@
 import { formatTimestamp } from "../utils/grid";
+import { useI18n } from "../i18n";
 
 const SPEEDS = [0.5, 1, 2, 4];
 
 export default function TimeControl({ timestamps, index, onChange, playing, onTogglePlay, speed, onSpeedChange }) {
+  const { locale, t } = useI18n();
   const entry = timestamps[index];
 
   return (
@@ -11,7 +13,7 @@ export default function TimeControl({ timestamps, index, onChange, playing, onTo
         <button
           className="play-btn"
           onClick={onTogglePlay}
-          aria-label={playing ? "Zatrzymaj animację" : "Odtwórz animację"}
+          aria-label={t(playing ? "time.pause" : "time.play")}
         >
           {playing ? "⏸" : "▶"}
         </button>
@@ -25,11 +27,11 @@ export default function TimeControl({ timestamps, index, onChange, playing, onTo
         />
       </div>
       <div className="time-label">
-        {entry ? formatTimestamp(entry.t) : "—"}
-        <span className="time-label-tz"> (czas lokalny)</span>
+        {entry ? formatTimestamp(entry.t, locale) : "—"}
+        <span className="time-label-tz"> ({t("time.local")})</span>
       </div>
       <div className="speed-row">
-        <span className="speed-label">Tempo</span>
+        <span className="speed-label">{t("time.speed")}</span>
         {SPEEDS.map((s) => (
           <button
             key={s}

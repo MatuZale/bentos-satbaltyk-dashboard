@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "process-data": "python3 scripts/process_data.py",
-    "process-data:watch": "python3 scripts/process_data.py --watch"
+    "process-data": "python scripts/process_data.py",
+    "process-data:watch": "python scripts/process_data.py --watch"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

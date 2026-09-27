@@ -7,7 +7,8 @@ import PointsPanel from "./components/PointsPanel";
 import ChartModal from "./components/ChartModal";
 import BuoyModal from "./components/BuoyModal";
 import { BUOYS } from "./data/buoys";
-import { getGrid, sampleGrid, findNearestIndex, formatProductValue } from "./utils/grid";
+import { getGrid, sampleGrid, sampleGridNearby, findNearestIndex, formatProductValue } from "./utils/grid";
+import { useI18n } from "./i18n";
 import "./App.css";
 
 const PLAY_INTERVAL_MS = 700;
@@ -36,7 +37,62 @@ function makePinId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
+}
+
+function nearestEntryByTime(entries, targetIso) {
+  if (!entries?.length) return null;
+  if (!targetIso) return entries[entries.length - 1];
+  return entries[findNearestIndex(entries, targetIso)];
+}
+
+function buildPublicSignals(manifest, currentIso, location, signalGrids, t) {
+  function valueFor(productKey) {
+    const entry = nearestEntryByTime(manifest.products[productKey]?.timestamps, currentIso);
+    if (location && signalGrids[productKey]) {
+      const localValue = sampleGridNearby(
+        signalGrids[productKey],
+        manifest.grid,
+        manifest.bbox,
+        location.lat,
+        location.lon
+      );
+      if (Number.isFinite(localValue)) return localValue;
+    }
+    return entry?.stats?.mean ?? null;
+  }
+
+  const sst = valueFor("sst");
+  const chla = valueFor("chla");
+  const swh = valueFor("swh");
+
+  const cyanobacteriaRisk = chla == null ? 0.34 : clamp01((chla - 0.8) / 3.2);
+  const waveRisk = swh == null ? 0.25 : clamp01((swh - 0.4) / 1.4);
+  const tempComfort = sst == null ? 0.45 : clamp01((sst - 12) / 8);
+  const bathingScore = clamp01(0.78 - cyanobacteriaRisk * 0.38 - waveRisk * 0.28 + tempComfort * 0.12);
+
+  return [
+    {
+      label: t("signal.bathing"),
+      value: t(bathingScore > 0.66 ? "signal.good" : bathingScore > 0.42 ? "signal.caution" : "signal.discouraged"),
+      tone: bathingScore > 0.66 ? "good" : bathingScore > 0.42 ? "warn" : "bad",
+    },
+    {
+      label: t("signal.cyanobacteria"),
+      value: t(cyanobacteriaRisk < 0.35 ? "signal.low" : cyanobacteriaRisk < 0.68 ? "signal.medium" : "signal.high"),
+      tone: cyanobacteriaRisk < 0.35 ? "good" : cyanobacteriaRisk < 0.68 ? "warn" : "bad",
+    },
+    {
+      label: t("signal.comfort"),
+      value: t(tempComfort > 0.62 && waveRisk < 0.55 ? "signal.comfortHigh" : tempComfort > 0.38 ? "signal.moderate" : "signal.cold"),
+      tone: tempComfort > 0.62 && waveRisk < 0.55 ? "good" : "warn",
+    },
+  ];
+}
+
 export default function App() {
+  const { language, setLanguage, locale, t } = useI18n();
   const [manifest, setManifest] = useState(null);
   const [error, setError] = useState(null);
   const [product, setProduct] = useState("sst");
@@ -55,6 +111,10 @@ export default function App() {
   );
   const [buoysVisible, setBuoysVisible] = useState(true);
   const [openBuoyId, setOpenBuoyId] = useState(null);
+  const [selectedBuoyId, setSelectedBuoyId] = useState(null);
+  const [selectedPinId, setSelectedPinId] = useState(null);
+  const [signalGrids, setSignalGrids] = useState({});
+  const [signalsOpen, setSignalsOpen] = useState(true);
 
   function loadManifest(isFirstLoad) {
     return fetch(`${import.meta.env.BASE_URL}data/manifest.json?t=${Date.now()}`)
@@ -92,6 +152,23 @@ export default function App() {
 
   const entries = manifest?.products[product]?.timestamps ?? [];
   const currentEntry = entries[index];
+
+  // Ocena warunkow korzysta jednoczesnie z SST, chlorofilu i wysokosci fali,
+  // niezaleznie od warstwy wybranej aktualnie w panelu bocznym.
+  useEffect(() => {
+    if (!manifest) return;
+    let cancelled = false;
+    const sources = ["sst", "chla", "swh"]
+      .map((key) => [key, nearestEntryByTime(manifest.products[key]?.timestamps, currentEntry?.t)?.grid])
+      .filter(([, url]) => url);
+
+    Promise.all(sources.map(async ([key, url]) => [key, await getGrid(url)])).then((loaded) => {
+      if (!cancelled) setSignalGrids(Object.fromEntries(loaded));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [manifest, currentEntry?.t]);
 
   // Ladowanie siatki wartosci dla aktualnej warstwy (do odczytu pod kursorem i w punktach)
   useEffect(() => {
@@ -135,40 +212,55 @@ export default function App() {
   }
 
   function handleAddPin(lat, lon) {
+    const id = makePinId();
     setPins((prev) => {
-      const next = [...prev, { id: makePinId(), lat, lon }];
+      const next = [...prev, { id, lat, lon }];
       return next.length > MAX_PINS ? next.slice(next.length - MAX_PINS) : next;
     });
+    setSelectedPinId(id);
+    setOpenBuoyId(null);
+    setSelectedBuoyId(null);
   }
 
   function handleRemovePin(id) {
     setPins((prev) => prev.filter((p) => p.id !== id));
     setChartPinId((cur) => (cur === id ? null : cur));
+    setSelectedPinId((cur) => (cur === id ? null : cur));
   }
 
   if (error) {
     return (
       <div className="state-message">
-        Nie udało się wczytać danych ({error}). Uruchom najpierw{" "}
+        {t("app.loadError", { error })}{" "}
         <code>npm run process-data</code>.
       </div>
     );
   }
   if (!manifest) {
-    return <div className="state-message">Wczytywanie…</div>;
+    return <div className="state-message">{t("app.loading")}</div>;
   }
 
-  const activeProduct = manifest.products[product];
+  const activeProduct = { ...manifest.products[product], label: t(`product.${product}`) };
   const hoverValue =
     hoverLatLng && gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, hoverLatLng.lat, hoverLatLng.lon) : null;
-  const hoverLabel = hoverLatLng ? (formatProductValue(activeProduct, hoverValue) ?? "brak danych") : null;
+  const hoverLabel = hoverLatLng ? (formatProductValue(activeProduct, hoverValue) ?? t("common.noData")) : null;
   const pointsWithValues = pins.map((p) => {
     const value = gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, p.lat, p.lon) : null;
     return { ...p, label: formatProductValue(activeProduct, value) };
   });
+  const selectedPinIndex = pins.findIndex((p) => p.id === selectedPinId);
+  const selectedPin = selectedPinIndex >= 0 ? pins[selectedPinIndex] : null;
+  const selectedBuoy = BUOYS.find((b) => b.id === selectedBuoyId) ?? null;
+  const signalLocation = selectedBuoy ?? selectedPin;
+  const signalScope = selectedBuoy
+    ? t("signal.scopeBuoy", { name: selectedBuoy.name, place: language === "en" ? selectedBuoy.placeEn : selectedBuoy.place })
+    : selectedPin
+      ? t("signal.scopePoint", { letter: "ABCDEFGHIJ"[selectedPinIndex] ?? "?", lat: selectedPin.lat.toFixed(3), lon: selectedPin.lon.toFixed(3) })
+      : t("signal.scopeBaltic");
+  const publicSignals = buildPublicSignals(manifest, currentEntry?.t, signalLocation, signalGrids, t);
 
   return (
-    <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}`}>
+    <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}${signalsOpen ? "" : " signals-collapsed"}`}>
       <aside className={`sidebar${sidebarOpen ? "" : " is-collapsed"}`}>
         <Sidebar products={manifest.products} activeProduct={product} onSelect={handleSelectProduct} />
 
@@ -192,8 +284,8 @@ export default function App() {
         <section className="panel buoys-toggle-panel">
           <div className="switch-row">
             <span className="switch-label">
-              Boje pomiarowe
-              <span className="buoy-sim-tag">symulacja</span>
+              {t("sidebar.buoys")}
+              <span className="buoy-sim-tag">{t("common.simulation")}</span>
             </span>
             <button
               className={`switch${buoysVisible ? " is-on" : ""}`}
@@ -202,6 +294,7 @@ export default function App() {
               onClick={() =>
                 setBuoysVisible((v) => {
                   if (v) setOpenBuoyId(null); // chowamy boje - zamykamy tez ewentualny otwarty panel
+                  if (v) setSelectedBuoyId(null);
                   return !v;
                 })
               }
@@ -213,25 +306,36 @@ export default function App() {
 
         <PointsPanel
           points={pointsWithValues}
+          selectedPointId={selectedPinId}
           pinMode={pinMode}
           onTogglePinMode={() => setPinMode((v) => !v)}
           onRemove={handleRemovePin}
           onClear={() => {
             setPins([]);
             setChartPinId(null);
+            setSelectedPinId(null);
           }}
-          onShowChart={setChartPinId}
+          onSelect={(id) => {
+            setSelectedPinId(id);
+            setOpenBuoyId(null);
+            setSelectedBuoyId(null);
+          }}
+          onShowChart={(id) => {
+            setSelectedPinId(id);
+            setOpenBuoyId(null);
+            setSelectedBuoyId(null);
+            setChartPinId(id);
+          }}
         />
 
         <footer className="sidebar-footer">
-          Dane: SatBałtyk (satbaltyk.pl) · wygenerowano {new Date(manifest.generated_at).toLocaleString("pl-PL")}
+          {t("footer.data", { date: new Date(manifest.generated_at).toLocaleString(locale) })}
           <br />
-          Część projektu{" "}
+          {t("footer.projectBefore")}{" "}
           <a href="https://bentos.info" target="_blank" rel="noreferrer">
             Bentos
           </a>{" "}
-          — dofinansowanego ze środków Funduszy Europejskich dla Pomorza, Unii Europejskiej oraz Urzędu
-          Marszałkowskiego Województwa Pomorskiego.
+          {t("footer.projectAfter")}
           <div className="sidebar-footer-legal">© 2026 BENTOS · EmbeddedSystems.do × IOPAN</div>
         </footer>
       </aside>
@@ -239,22 +343,74 @@ export default function App() {
       <button
         className="sidebar-toggle"
         onClick={() => setSidebarOpen((v) => !v)}
-        aria-label={sidebarOpen ? "Schowaj panel" : "Pokaż panel"}
+        aria-label={t(sidebarOpen ? "sidebar.hide" : "sidebar.show")}
       >
         <span className="sidebar-toggle-chevron">{sidebarOpen ? "‹" : "›"}</span>
-        <span className="sidebar-toggle-label">{sidebarOpen ? "Zamknij" : "☰ Warstwy"}</span>
+        <span className="sidebar-toggle-label">{sidebarOpen ? t("common.close") : `☰ ${t("sidebar.layersButton")}`}</span>
       </button>
 
       <main className="map-wrap">
         <div className="brand-badge">
-          <img src={`${import.meta.env.BASE_URL}brand/bentos-logo.png`} alt="Bentos" className="brand-badge-logo" />
-          <span className="brand-badge-location">Zatoka Gdańska · Trójmiasto</span>
+          <div className="brand-badge-id">
+            <img src={`${import.meta.env.BASE_URL}brand/bentos-logo.png`} alt="Bentos" className="brand-badge-logo" />
+            <span className="brand-badge-location">{t("brand.location")}</span>
+          </div>
+          <div className={`language-switch is-${language}`} role="group" aria-label={t("language.label")}>
+            <span className="language-switch-thumb" aria-hidden="true" />
+            {["pl", "en"].map((lang) => (
+              <button
+                key={lang}
+                className={language === lang ? "is-active" : ""}
+                onClick={() => setLanguage(lang)}
+                aria-pressed={language === lang}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Ocena zostaje na ekranie tez przy otwartym panelu boi - od razu
+            przelacza sie na wybrana boje/punkt (key na zakresie odpala
+            krotkie podswietlenie, zeby bylo widac, ze sie przeliczyla). */}
+        <div
+          className={`public-signals${signalsOpen ? "" : " is-collapsed"}`}
+          aria-label={t("signal.aria")}
+        >
+          <div className="public-signals-head">
+            <span>{t("signal.title")}</span>
+            <div className="public-signals-head-actions">
+              <strong>{t("signal.demo")}</strong>
+              <button
+                className="public-signals-toggle"
+                onClick={() => setSignalsOpen((open) => !open)}
+                aria-expanded={signalsOpen}
+                aria-label={t(signalsOpen ? "signal.hide" : "signal.show")}
+                title={t(signalsOpen ? "signal.hide" : "signal.show")}
+              >
+                {signalsOpen ? "−" : "+"}
+              </button>
+            </div>
+          </div>
+          {signalsOpen && (
+            <>
+              <div className="public-signals-scope" title={signalScope}>{signalScope}</div>
+              <div className="public-signals-grid" key={signalScope}>
+                {publicSignals.map((signal) => (
+                  <div className={`public-signal is-${signal.tone}`} key={signal.label}>
+                    <span>{signal.label}</span>
+                    <strong>{signal.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="alpha-badge">
           <span className="alpha-badge-dot" />
           <span className="alpha-badge-text">
-            <strong>ALPHA</strong> — wersja testowa, dane i wygląd mogą się jeszcze zmieniać
+            <strong>ALPHA</strong> — {t("app.alpha")}
           </span>
         </div>
 
@@ -264,12 +420,22 @@ export default function App() {
           productKey={product}
           hoverLabel={hoverLabel}
           pins={pins}
+          selectedPinId={selectedPinId}
           pinMode={pinMode}
           buoysVisible={buoysVisible}
+          selectedBuoyId={selectedBuoyId}
           onHover={handleHover}
-          onPinClick={handleRemovePin}
+          onPinClick={(id) => {
+            setSelectedPinId(id);
+            setOpenBuoyId(null);
+            setSelectedBuoyId(null);
+          }}
           onMapClick={handleAddPin}
-          onBuoyClick={setOpenBuoyId}
+          onBuoyClick={(id) => {
+            setSelectedPinId(null);
+            setSelectedBuoyId(id);
+            setOpenBuoyId(id);
+          }}
         />
       </main>
 
@@ -294,7 +460,14 @@ export default function App() {
         (() => {
           const buoy = BUOYS.find((b) => b.id === openBuoyId);
           if (!buoy) return null;
-          return <BuoyModal buoy={buoy} timestampIso={currentEntry?.t} onClose={() => setOpenBuoyId(null)} />;
+          return (
+            <BuoyModal
+              buoy={buoy}
+              timestampIso={currentEntry?.t}
+              entries={entries}
+              onClose={() => setOpenBuoyId(null)}
+            />
+          );
         })()}
     </div>
   );

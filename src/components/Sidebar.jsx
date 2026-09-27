@@ -1,10 +1,12 @@
 import { PRODUCT_ICONS } from "./icons";
+import { useI18n } from "../i18n";
 
 const PRODUCT_ORDER = ["sst", "chla", "swh", "mwdir"];
 
 export default function Sidebar({ products, activeProduct, onSelect }) {
+  const { t } = useI18n();
   return (
-    <nav className="product-list" aria-label="Wybór warstwy danych">
+    <nav className="product-list" aria-label={t("sidebar.layers")}>
       {PRODUCT_ORDER.filter((key) => products[key]).map((key) => {
         const p = products[key];
         const isActive = key === activeProduct;
@@ -22,9 +24,9 @@ export default function Sidebar({ products, activeProduct, onSelect }) {
               </span>
             )}
             <span className="product-btn-text">
-              <span className="product-btn-label">{p.label}</span>
+              <span className="product-btn-label">{t(`product.${key}`)}</span>
               <span className="product-btn-meta">
-                {p.timestamps.length} {p.timestamps.length === 1 ? "zdjęcie" : "zdjęć"}
+                {p.timestamps.length} {t(p.timestamps.length === 1 ? "sidebar.image.one" : "sidebar.image.many")}
               </span>
             </span>
           </button>

@@ -1,13 +1,25 @@
+import { useI18n } from "../i18n";
+
 const PIN_LETTERS = "ABCDEFGHIJ";
 
-export default function PointsPanel({ points, pinMode, onTogglePinMode, onRemove, onClear, onShowChart }) {
+export default function PointsPanel({
+  points,
+  selectedPointId,
+  pinMode,
+  onTogglePinMode,
+  onRemove,
+  onClear,
+  onSelect,
+  onShowChart,
+}) {
+  const { t } = useI18n();
   return (
     <section className="panel points-panel">
       <div className="points-panel-head">
-        <h2>Punkty pomiarowe</h2>
+        <h2>{t("points.title")}</h2>
         {points.length > 0 && (
           <button className="points-clear" onClick={onClear}>
-            wyczyść
+            {t("points.clear")}
           </button>
         )}
       </div>
@@ -17,34 +29,36 @@ export default function PointsPanel({ points, pinMode, onTogglePinMode, onRemove
         onClick={onTogglePinMode}
         aria-pressed={pinMode}
       >
-        {pinMode ? "Kliknij na mapę… (Zakończ)" : "+ Dodaj punkt"}
+        {t(pinMode ? "points.finish" : "points.add")}
       </button>
 
       {points.length === 0 ? (
         <p className="points-empty">
           {pinMode
-            ? "Wskaż miejsce na mapie, aby dodać pierwszy punkt."
-            : "Kliknij „+ Dodaj punkt”, a potem wskaż miejsce na mapie, aby porównać wartości."}
+            ? t("points.emptyArmed")
+            : t("points.empty")}
         </p>
       ) : (
         <ul className="points-list">
           {points.map((p, i) => (
-            <li key={p.id} className="points-row">
+            <li key={p.id} className={`points-row${selectedPointId === p.id ? " is-selected" : ""}`}>
               <div className="points-row-top">
-                <span className="points-letter">{PIN_LETTERS[i] ?? "?"}</span>
-                <span className="points-coords">
-                  {p.lat.toFixed(3)}, {p.lon.toFixed(3)}
-                </span>
-                <button className="points-remove" onClick={() => onRemove(p.id)} aria-label="Usuń punkt">
+                <button className="points-select" onClick={() => onSelect(p.id)} aria-pressed={selectedPointId === p.id}>
+                  <span className="points-letter">{PIN_LETTERS[i] ?? "?"}</span>
+                  <span className="points-coords">
+                    {p.lat.toFixed(3)}, {p.lon.toFixed(3)}
+                  </span>
+                </button>
+                <button className="points-remove" onClick={() => onRemove(p.id)} aria-label={t("points.remove")}>
                   ×
                 </button>
               </div>
               <div className="points-row-bottom">
                 <span className={`points-value${p.label ? "" : " points-value-empty"}`}>
-                  {p.label ?? "brak danych"}
+                  {p.label ?? t("common.noData")}
                 </span>
                 <button className="points-chart-btn" onClick={() => onShowChart(p.id)}>
-                  pokaż wykres
+                  {t("points.chart")}
                 </button>
               </div>
             </li>

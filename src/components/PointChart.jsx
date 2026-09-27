@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { loadPointSeries, formatTimestampShort, degToCompass } from "../utils/grid";
+import { nearestPointIndex } from "../utils/chartAxis";
+import { useI18n } from "../i18n";
+import ChartTimeAxis from "./ChartTimeAxis";
 
 const WIDTH = 620;
 const HEIGHT = 260;
-const PAD = { top: 16, right: 16, bottom: 34, left: 46 };
+const PAD = { top: 16, right: 16, bottom: 40, left: 46 };
 const INNER_W = WIDTH - PAD.left - PAD.right;
 const INNER_H = HEIGHT - PAD.top - PAD.bottom;
 
@@ -22,13 +25,8 @@ function splitSegments(series) {
   return segments;
 }
 
-function pickTickIndices(n, count) {
-  if (n <= 1) return [0];
-  const step = (n - 1) / (count - 1);
-  return Array.from({ length: count }, (_, i) => Math.round(i * step));
-}
-
 export default function PointChart({ point, product, entries, grid, bbox }) {
+  const { locale, t } = useI18n();
   const [series, setSeries] = useState(null); // null = ladowanie
   const [hoverIdx, setHoverIdx] = useState(null);
   const svgRef = useRef(null);
@@ -45,12 +43,12 @@ export default function PointChart({ point, product, entries, grid, bbox }) {
   }, [entries, grid, bbox, point.lat, point.lon]);
 
   if (series === null) {
-    return <p className="chart-status">Ładowanie {entries.length} klatek…</p>;
+    return <p className="chart-status">{t("chart.loading", { count: entries.length })}</p>;
   }
 
   const valid = series.filter((d) => d.value != null);
   if (valid.length === 0) {
-    return <p className="chart-status">Brak danych dla tego punktu w dostępnym zakresie czasu.</p>;
+    return <p className="chart-status">{t("chart.noData")}</p>;
   }
 
   const times = series.map((d) => new Date(d.t).getTime());
@@ -91,21 +89,8 @@ export default function PointChart({ point, product, entries, grid, bbox }) {
     ? [0, 90, 180, 270, 360]
     : Array.from({ length: 4 }, (_, i) => vMin + ((vMax - vMin) * i) / 3);
 
-  const xTickIdx = pickTickIndices(series.length, Math.min(5, series.length));
-
   function handleMove(evt) {
-    const rect = svgRef.current.getBoundingClientRect();
-    const svgX = ((evt.clientX - rect.left) / rect.width) * WIDTH;
-    let best = 0;
-    let bestDist = Infinity;
-    points.forEach((p, i) => {
-      const d = Math.abs(p.x - svgX);
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
-      }
-    });
-    setHoverIdx(best);
+    setHoverIdx(nearestPointIndex(svgRef.current, evt, points, WIDTH));
   }
 
   const hover = hoverIdx != null ? points[hoverIdx] : null;
@@ -131,17 +116,16 @@ export default function PointChart({ point, product, entries, grid, bbox }) {
           );
         })}
 
-        {xTickIdx.map((i) => (
-          <text
-            key={i}
-            x={points[i].x}
-            y={HEIGHT - PAD.bottom + 18}
-            className="chart-axis-label"
-            textAnchor="middle"
-          >
-            {formatTimestampShort(series[i].t)}
-          </text>
-        ))}
+        <ChartTimeAxis
+          series={series}
+          times={times}
+          xFor={xFor}
+          y={PAD.top + INNER_H + 16}
+          count={6}
+          labelWidth={44}
+          gap={18}
+          locale={locale}
+        />
 
         {product.circular
           ? points
@@ -179,10 +163,10 @@ export default function PointChart({ point, product, entries, grid, bbox }) {
 
       {hover && (
         <div className="chart-tooltip" style={{ left: `${(hover.x / WIDTH) * 100}%` }}>
-          <div className="chart-tooltip-time">{formatTimestampShort(hover.t)}</div>
+          <div className="chart-tooltip-time">{formatTimestampShort(hover.t, locale)}</div>
           <div className="chart-tooltip-value">
             {hover.value == null
-              ? "brak danych"
+              ? t("common.noData")
               : product.circular
               ? `${hover.value.toFixed(0)}° (${degToCompass(hover.value)})`
               : `${hover.value.toFixed(2)} ${product.unit}`}

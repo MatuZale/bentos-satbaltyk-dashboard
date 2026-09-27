@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.matplotlib-cache/
 *.log
 .DS_Store
 
@@ -7,3 +8,6 @@ dist/
 # public/data/ (wygenerowane PNG/f32/manifest, ~20MB) JEST commitowane -
 # to jedyne dane, których potrzebuje działający dashboard.
 dane/
+
+# Tymczasowe pliki z lokalnych testow (profile przegladarki, zrzuty ekranu)
+.tmp-*

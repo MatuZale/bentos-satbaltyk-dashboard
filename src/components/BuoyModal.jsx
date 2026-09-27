@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import BuoyCamera from "./BuoyCamera";
+import BuoyChart, { BUOY_CHART_METRICS } from "./BuoyChart";
 import { simulateBuoyReading } from "../utils/simulate";
 import { degToCompass, formatTimestamp } from "../utils/grid";
 import { useAnimatedNumber, shortestAngleDelta } from "../utils/useAnimatedNumber";
+import { useI18n } from "../i18n";
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-export default function BuoyModal({ buoy, timestampIso, onClose }) {
+export default function BuoyModal({ buoy, timestampIso, entries = [], onClose }) {
+  const { language, locale, t } = useI18n();
   const [pos, setPos] = useState(null); // null = domyslna pozycja z CSS (top-right); po przeciagnieciu {x,y}
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
+  const [chartMetric, setChartMetric] = useState("waterTemp");
   const dragRef = useRef({ dragging: false, offsetX: 0, offsetY: 0 });
   const panelRef = useRef(null);
 
@@ -84,24 +90,25 @@ export default function BuoyModal({ buoy, timestampIso, onClose }) {
   const pressure = useAnimatedNumber(r.pressure);
   const battery = useAnimatedNumber(r.battery);
   const signal = useAnimatedNumber(r.signal);
+  const detailsOpen = cameraOpen || chartOpen;
 
   const tiles = [
-    { label: "Temp. wody", value: waterTemp.toFixed(1), unit: "°C", frac: clamp01(waterTemp / 25) },
-    { label: "Wys. fali", value: waveHeight.toFixed(2), unit: "m", frac: clamp01(waveHeight / 3) },
+    { label: t("buoy.metric.waterTemp"), value: waterTemp.toFixed(1), unit: "°C", frac: clamp01(waterTemp / 25) },
+    { label: t("buoy.metric.waveHeight"), value: waveHeight.toFixed(2), unit: "m", frac: clamp01(waveHeight / 3) },
     {
-      label: "Wiatr",
+      label: t("buoy.metric.windSpeed"),
       value: windSpeed.toFixed(0),
       unit: `km/h ${degToCompass(((windDir % 360) + 360) % 360)}`,
       frac: clamp01(windSpeed / 40),
     },
-    { label: "Ciśnienie", value: pressure.toFixed(0), unit: "hPa", frac: clamp01((pressure - 970) / 70) },
-    { label: "Bateria", value: Math.round(battery), unit: "%", frac: clamp01(battery / 100) },
-    { label: "Sygnał", value: Math.round(signal), unit: "/5", frac: clamp01(signal / 5) },
+    { label: t("buoy.metric.pressure"), value: pressure.toFixed(0), unit: "hPa", frac: clamp01((pressure - 970) / 70) },
+    { label: t("buoy.metric.battery"), value: Math.round(battery), unit: "%", frac: clamp01(battery / 100) },
+    { label: t("buoy.metric.signal"), value: Math.round(signal), unit: "/5", frac: clamp01(signal / 5) },
   ];
 
   return (
     <div
-      className="buoy-panel"
+      className={`buoy-panel${detailsOpen ? " has-details" : ""}`}
       ref={panelRef}
       style={pos ? { left: pos.x, top: pos.y, right: "auto" } : undefined}
     >
@@ -111,52 +118,90 @@ export default function BuoyModal({ buoy, timestampIso, onClose }) {
         onTouchStart={handleTouchDragStart}
       >
         <div>
-          <span className="modal-title">Boja „{buoy.name}”</span>
-          <span className="buoy-sim-tag">symulacja</span>
+          <span className="modal-title">{t("buoy.title", { name: buoy.name })}</span>
+          <span className="buoy-sim-tag">{t("common.simulation")}</span>
           <div className="modal-subtitle">
-            {buoy.place} · {buoy.lat.toFixed(4)}, {buoy.lon.toFixed(4)}
+            {language === "en" ? buoy.placeEn : buoy.place} · {buoy.lat.toFixed(4)}, {buoy.lon.toFixed(4)}
           </div>
         </div>
-        <button className="modal-close" onClick={onClose} aria-label="Zamknij">
+        <button className="modal-close" onClick={onClose} aria-label={t("common.close")}>
           ×
         </button>
       </div>
 
-      <BuoyCamera timestampIso={timestampIso} />
-
-      <div className="stream-eyebrow">
-        <span className="stream-eyebrow-highlight">Podgląd strumienia danych</span>
-      </div>
-      <div className="buoy-stream">
-        <div className="buoy-stream-header">
-          <span className="buoy-stream-live">
-            <span className="buoy-live-dot" />
-            SYMULACJA · BOJA
-          </span>
-          <span className="buoy-stream-time">{timestampIso ? formatTimestamp(timestampIso) : "—"}</span>
-        </div>
-
-        <div className="buoy-telemetry">
-          {tiles.map((t) => (
-            <div className="buoy-stat" key={t.label}>
-              <span className="buoy-stat-label">{t.label}</span>
-              <span className="buoy-stat-value">
-                {t.value} <small>{t.unit}</small>
+      <div className="buoy-panel-body">
+        <div className="buoy-panel-data">
+          <div className="stream-eyebrow">
+            <span className="stream-eyebrow-highlight">{t("buoy.preview")}</span>
+          </div>
+          <div className="buoy-stream">
+            <div className="buoy-stream-header">
+              <span className="buoy-stream-live">
+                <span className="buoy-live-dot" />
+                {t("buoy.stream")}
               </span>
-              <span className="buoy-stat-bar">
-                <span className="buoy-stat-bar-fill" style={{ width: `${t.frac * 100}%` }} />
-              </span>
+              <span className="buoy-stream-time">{timestampIso ? formatTimestamp(timestampIso, locale) : "—"}</span>
             </div>
-          ))}
+
+            <div className="buoy-telemetry">
+              {tiles.map((t) => (
+                <div className="buoy-stat" key={t.label}>
+                  <span className="buoy-stat-label">{t.label}</span>
+                  <span className="buoy-stat-value">
+                    {t.value} <small>{t.unit}</small>
+                  </span>
+                  <span className="buoy-stat-bar">
+                    <span className="buoy-stat-bar-fill" style={{ width: `${t.frac * 100}%` }} />
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="buoy-stream-footer">{t("buoy.footer")}</div>
+          </div>
+
+          <div className="buoy-detail-controls">
+            <div className="buoy-detail-control">
+              <span>{t("buoy.camera")}</span>
+              <button className="buoy-chart-toggle" onClick={() => setCameraOpen((v) => !v)}>
+                {t(cameraOpen ? "buoy.hideCamera" : "buoy.showCamera")}
+              </button>
+            </div>
+            <div className="buoy-detail-control">
+              <span>{t("buoy.history")}</span>
+              <button className="buoy-chart-toggle" onClick={() => setChartOpen((v) => !v)}>
+                {t(chartOpen ? "buoy.hideChart" : "buoy.showChart")}
+              </button>
+            </div>
+          </div>
+
+          <p className="buoy-disclaimer">
+            {t("buoy.disclaimer")}
+          </p>
         </div>
 
-        <div className="buoy-stream-footer">Symulacja · 6 parametrów</div>
+        {detailsOpen && (
+          <div className="buoy-panel-details">
+            {cameraOpen && <BuoyCamera />}
+            {chartOpen && (
+              <div className="buoy-chart-panel">
+                <div className="buoy-chart-tabs">
+                  {Object.entries(BUOY_CHART_METRICS).map(([key, metric]) => (
+                    <button
+                      key={key}
+                      className={`buoy-chart-tab${chartMetric === key ? " is-active" : ""}`}
+                      onClick={() => setChartMetric(key)}
+                    >
+                      {t(metric.labelKey)}
+                    </button>
+                  ))}
+                </div>
+                <BuoyChart buoy={buoy} entries={entries} metricKey={chartMetric} />
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      <p className="buoy-disclaimer">
-        Boja jest demonstracją koncepcji — dane, zdjęcie i lokalizacja są symulowane, nie pochodzą z
-        rzeczywistego urządzenia.
-      </p>
     </div>
   );
 }

@@ -69,12 +69,3 @@ export function simulateBuoyReading(buoyId, timestampIso) {
 
   return { waterTemp, waveHeight, windDir, windSpeed, pressure, battery, signal };
 }
-
-export function getLocalHour(iso) {
-  if (!iso) return 12;
-  return Number(
-    new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", hour: "2-digit", hour12: false }).format(
-      new Date(iso)
-    )
-  );
-}

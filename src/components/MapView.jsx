@@ -5,12 +5,18 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { PRODUCT_ICONS, BuoyIcon } from "./icons";
 import { BUOYS } from "../data/buoys";
+import { useI18n } from "../i18n";
 
 const PIN_LETTERS = "ABCDEFGHIJ";
+const BALTIC_CENTER = [58.7, 20.4];
+const BALTIC_MAX_BOUNDS = [
+  [53.0, 9.0],
+  [66.5, 31.5],
+];
 
-function buildPinIcon(Icon, letter) {
+function buildPinIcon(Icon, letter, isSelected) {
   const html = renderToStaticMarkup(
-    <div className="pin-marker">
+    <div className={`pin-marker${isSelected ? " is-selected" : ""}`}>
       <span className="pin-marker-ring" />
       <span className="pin-marker-icon">
         <Icon />
@@ -26,19 +32,21 @@ function buildPinIcon(Icon, letter) {
   });
 }
 
-const BUOY_ICON = L.divIcon({
-  html: renderToStaticMarkup(
-    <div className="buoy-marker">
-      <span className="buoy-marker-ring" />
-      <span className="buoy-marker-icon">
-        <BuoyIcon />
-      </span>
-    </div>
-  ),
-  className: "pin-marker-wrap",
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-});
+function buildBuoyIcon(isSelected) {
+  return L.divIcon({
+    html: renderToStaticMarkup(
+      <div className={`buoy-marker${isSelected ? " is-selected" : ""}`}>
+        <span className="buoy-marker-ring" />
+        <span className="buoy-marker-icon">
+          <BuoyIcon />
+        </span>
+      </div>
+    ),
+    className: "pin-marker-wrap",
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+}
 
 // Jeden nasluch zdarzen mapy: mousemove karmi "celownik" (pozycja w pikselach
 // kontenera + wartosc pod kursorem zamiast golego kursora), klik dodaje/usuwa
@@ -66,13 +74,16 @@ export default function MapView({
   productKey,
   hoverLabel,
   pins,
+  selectedPinId,
   pinMode,
   buoysVisible,
+  selectedBuoyId,
   onHover,
   onPinClick,
   onMapClick,
   onBuoyClick,
 }) {
+  const { t } = useI18n();
   const bounds = useMemo(() => {
     const [lonMin, latMin, lonMax, latMax] = bbox;
     return [
@@ -81,34 +92,26 @@ export default function MapView({
     ];
   }, [bbox]);
 
-  // Nieco szersze niz same dane granice panoramowania - widac odrobine
-  // kontekstu wokol obszaru zainteresowania, ale nie da sie "zgubic" gdzies
-  // w otwartym Baltyku daleko od Trojmiasta.
-  const maxBounds = useMemo(() => {
-    const [lonMin, latMin, lonMax, latMax] = bbox;
-    const padLon = (lonMax - lonMin) * 0.3;
-    const padLat = (latMax - latMin) * 0.3;
-    return [
-      [latMin - padLat, lonMin - padLon],
-      [latMax + padLat, lonMax + padLon],
-    ];
-  }, [bbox]);
-
   const [cursor, setCursor] = useState(null); // {x,y} w pikselach kontenera mapy
   const Icon = PRODUCT_ICONS[productKey];
 
   const pinIcons = useMemo(
-    () => pins.map((_, i) => buildPinIcon(PRODUCT_ICONS[productKey], PIN_LETTERS[i] ?? "?")),
-    [pins, productKey]
+    () => pins.map((pin, i) => buildPinIcon(PRODUCT_ICONS[productKey], PIN_LETTERS[i] ?? "?", pin.id === selectedPinId)),
+    [pins, productKey, selectedPinId]
+  );
+
+  const buoyIcons = useMemo(
+    () => Object.fromEntries(BUOYS.map((b) => [b.id, buildBuoyIcon(b.id === selectedBuoyId)])),
+    [selectedBuoyId]
   );
 
   return (
     <MapContainer
-      center={[54.5, 18.7]}
-      zoom={10}
-      minZoom={8}
+      center={BALTIC_CENTER}
+      zoom={5}
+      minZoom={5}
       maxZoom={13}
-      maxBounds={maxBounds}
+      maxBounds={BALTIC_MAX_BOUNDS}
       maxBoundsViscosity={1.0}
       className={`map${pinMode ? " map-armed" : ""}`}
       preferCanvas
@@ -141,7 +144,7 @@ export default function MapView({
           <Marker
             key={b.id}
             position={[b.lat, b.lon]}
-            icon={BUOY_ICON}
+            icon={buoyIcons[b.id]}
             eventHandlers={{
               click: (e) => {
                 L.DomEvent.stopPropagation(e);
@@ -157,7 +160,7 @@ export default function MapView({
         onMapClick={pinMode ? onMapClick : () => {}}
       />
 
-      {pinMode && <div className="pin-mode-hint">Kliknij na mapę, aby dodać punkt pomiarowy</div>}
+      {pinMode && <div className="pin-mode-hint">{t("map.addHint")}</div>}
 
       {cursor && (
         <div className="measure-cursor" style={{ left: cursor.x, top: cursor.y }}>

@@ -14,18 +14,62 @@ export function getGrid(url) {
   return gridCache.get(url);
 }
 
-// Odczytuje wartosc w siatce (top-to-bottom, jak w rastrze GDAL) dla podanego lat/lon.
-// Zwraca null gdy punkt jest poza zasiegiem siatki albo to NoData (ląd / brak danych).
-export function sampleGrid(floatArray, grid, bbox, lat, lon) {
+function mercatorY(lat) {
+  const radians = (lat * Math.PI) / 180;
+  return Math.log(Math.tan(Math.PI / 4 + radians / 2));
+}
+
+function gridCell(grid, bbox, lat, lon) {
   const [lonMin, latMin, lonMax, latMax] = bbox;
   if (lon < lonMin || lon > lonMax || lat < latMin || lat > latMax) return null;
 
   const col = Math.floor(((lon - lonMin) / (lonMax - lonMin)) * grid.width);
-  const row = Math.floor(((latMax - lat) / (latMax - latMin)) * grid.height);
-  if (col < 0 || col >= grid.width || row < 0 || row >= grid.height) return null;
+  const north = mercatorY(latMax);
+  const south = mercatorY(latMin);
+  const row = Math.floor(((north - mercatorY(lat)) / (north - south)) * grid.height);
+  return col < 0 || col >= grid.width || row < 0 || row >= grid.height ? null : { col, row };
+}
 
-  const value = floatArray[row * grid.width + col];
+// Odczytuje wartosc z siatki ulozonej tak samo jak ImageOverlay w Leaflet.
+// Zwraca null poza zasiegiem albo dla NoData (lad / brak danych).
+export function sampleGrid(floatArray, grid, bbox, lat, lon) {
+  const cell = gridCell(grid, bbox, lat, lon);
+  if (!cell) return null;
+
+  const value = floatArray[cell.row * grid.width + cell.col];
   return Number.isNaN(value) ? null : value;
+}
+
+// Punkty przybrzezne (np. boja obok mola) moga po zaokragleniu trafic w
+// komorke ladowa. Do ocen lokalnych bierzemy wtedy najblizsza poprawna
+// komorke morska z niewielkiego sasiedztwa rastra.
+export function sampleGridNearby(floatArray, grid, bbox, lat, lon, maxRadius = 5) {
+  const cell = gridCell(grid, bbox, lat, lon);
+  if (!cell) return null;
+  const centerCol = cell.col;
+  const centerRow = cell.row;
+
+  for (let radius = 0; radius <= maxRadius; radius += 1) {
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for (let rowOffset = -radius; rowOffset <= radius; rowOffset += 1) {
+      for (let colOffset = -radius; colOffset <= radius; colOffset += 1) {
+        if (radius > 0 && Math.max(Math.abs(rowOffset), Math.abs(colOffset)) !== radius) continue;
+        const row = centerRow + rowOffset;
+        const col = centerCol + colOffset;
+        if (row < 0 || row >= grid.height || col < 0 || col >= grid.width) continue;
+        const value = floatArray[row * grid.width + col];
+        if (!Number.isFinite(value)) continue;
+        const distance = rowOffset * rowOffset + colOffset * colOffset;
+        if (distance < nearestDistance) {
+          nearest = value;
+          nearestDistance = distance;
+        }
+      }
+    }
+    if (nearest != null) return nearest;
+  }
+  return null;
 }
 
 export function findNearestIndex(timestamps, targetIso) {
@@ -59,9 +103,9 @@ export function formatProductValue(product, value) {
     : `${value.toFixed(2)} ${product.unit}`;
 }
 
-export function formatTimestamp(iso) {
+export function formatTimestamp(iso, locale = "pl-PL") {
   const date = new Date(iso);
-  return new Intl.DateTimeFormat("pl-PL", {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: "Europe/Warsaw",
     weekday: "short",
     day: "2-digit",
@@ -72,9 +116,9 @@ export function formatTimestamp(iso) {
 }
 
 // Krotszy format do etykiet na osi wykresu (bez dnia tygodnia).
-export function formatTimestampShort(iso) {
+export function formatTimestampShort(iso, locale = "pl-PL") {
   const date = new Date(iso);
-  return new Intl.DateTimeFormat("pl-PL", {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: "Europe/Warsaw",
     day: "2-digit",
     month: "short",

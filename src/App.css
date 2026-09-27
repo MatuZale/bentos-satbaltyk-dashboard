@@ -106,21 +106,29 @@ body {
 }
 
 /* Plakietka marki pływająca nad mapą (prawy górny róg) - logo Bentos +
-   lokalizacja. Zastępuje dawny naglowek tekstowy w panelu bocznym. */
+   lokalizacja, a obok (za cienką kreską) przełącznik języka interfejsu. */
 .brand-badge {
   position: absolute;
   top: 14px;
   right: 14px;
   z-index: 650;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  padding: 10px 14px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
   background: rgba(0, 5, 31, 0.55);
   backdrop-filter: blur(4px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+}
+
+.brand-badge-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding-right: 12px;
+  border-right: 1px solid var(--border);
 }
 
 .brand-badge-logo {
@@ -136,6 +144,205 @@ body {
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+/* Przełącznik PL/EN - pigułka z przesuwanym limonkowym "kciukiem"
+   (ta sama stylistyka co przełącznik boi w panelu bocznym). */
+.language-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.language-switch-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(170, 255, 0, 0.35);
+  transition: transform 0.22s ease;
+}
+
+.language-switch.is-en .language-switch-thumb {
+  transform: translateX(100%);
+}
+
+.language-switch button {
+  position: relative;
+  z-index: 1;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.language-switch button:hover:not(.is-active) {
+  color: var(--text-primary);
+}
+
+.language-switch button.is-active {
+  color: var(--accent-ink);
+  cursor: default;
+}
+
+.language-switch button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.public-signals {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  z-index: 650;
+  width: min(420px, calc(100vw - 28px));
+  padding: 10px 12px 12px;
+  background: rgba(0, 5, 31, 0.66);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.public-signals.is-collapsed {
+  width: auto;
+  min-width: 190px;
+  padding: 8px 10px;
+}
+
+.public-signals-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.public-signals-head strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.public-signals.is-collapsed .public-signals-head {
+  margin-bottom: 0;
+}
+
+.public-signals-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.public-signals-toggle {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.public-signals-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.public-signals-scope {
+  margin: -2px 0 8px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-signals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.public-signal {
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.public-signal span,
+.public-signal strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.public-signal span {
+  margin-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.public-signal strong {
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+/* Krotkie podswietlenie po zmianie zakresu oceny (boja / punkt / caly
+   Baltyk) - siatka jest montowana od nowa, wiec animacja odpala sie sama. */
+.public-signal {
+  animation: signal-refresh 0.7s ease-out;
+}
+
+@keyframes signal-refresh {
+  from {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+}
+
+.public-signal.is-good strong {
+  color: var(--accent);
+}
+
+.public-signal.is-warn strong {
+  color: #ffd166;
+}
+
+.public-signal.is-bad strong {
+  color: #ff7a7a;
 }
 
 /* Plakietka "wersja alpha" - lewy dolny róg mapy, zeby nikt nie wzial tego
@@ -549,10 +756,34 @@ body {
   border: 1px solid var(--border);
 }
 
+.points-row.is-selected {
+  border-color: var(--accent);
+  background: rgba(170, 255, 0, 0.07);
+}
+
 .points-row-top {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.points-select {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.points-select:hover .points-coords,
+.points-select[aria-pressed="true"] .points-coords {
+  color: var(--text-primary);
 }
 
 .points-row-bottom {
@@ -760,6 +991,20 @@ body {
   transform: scale(1.12);
 }
 
+.pin-marker.is-selected {
+  background: var(--accent);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22), 0 0 18px rgba(170, 255, 0, 0.65);
+}
+
+.pin-marker.is-selected .pin-marker-icon {
+  color: var(--accent-ink);
+}
+
+.pin-marker.is-selected .pin-marker-ring {
+  border-color: #ffffff;
+}
+
 /* Sonarowy "ping" - ciagle emanujacy pierscien, zeby przypiete punkty
    wygladaly na aktywne pomiary, a nie statyczne znaczniki. */
 .pin-marker-ring {
@@ -817,6 +1062,22 @@ body {
 
 .buoy-marker:hover {
   transform: scale(1.12);
+}
+
+.buoy-marker.is-selected {
+  background: var(--accent);
+  border-color: #ffffff;
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22), 0 0 18px rgba(170, 255, 0, 0.65);
+}
+
+.buoy-marker.is-selected .buoy-marker-ring {
+  border-color: #ffffff;
+  animation-duration: 1.4s;
+}
+
+.buoy-marker.is-selected .buoy-marker-icon {
+  color: var(--accent-ink);
 }
 
 .buoy-marker-ring {
@@ -921,17 +1182,49 @@ body {
    sterowac panelem bocznym (np. wlaczyc animacje czasu). */
 .buoy-panel {
   position: fixed;
-  top: 76px;
+  top: 86px;
   right: 14px;
   z-index: 900;
-  width: min(340px, calc(100vw - 28px));
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
+  width: min(360px, calc(100vw - 380px));
   background: var(--bg-deep);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: 16px 18px 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.layout.sidebar-collapsed .buoy-panel {
+  width: min(360px, calc(100vw - 28px));
+}
+
+.buoy-panel.has-details {
+  width: min(700px, calc(100vw - 380px));
+}
+
+.layout.sidebar-collapsed .buoy-panel.has-details {
+  width: min(700px, calc(100vw - 28px));
+}
+
+.buoy-panel-body {
+  display: block;
+}
+
+.buoy-panel.has-details .buoy-panel-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.buoy-panel-data {
+  min-width: 0;
+}
+
+.buoy-panel-details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .modal-header {
@@ -982,20 +1275,22 @@ body {
   border-color: var(--border-strong);
 }
 
-/* "Kamera" boi - generowana scena SVG (nie prawdziwe zdjecie), z belka OSD
-   jak w przemyslowej kamerze, zeby bylo jasne ze to symulacja. */
+/* Publiczny podglad podwodny z belka OSD. */
 .buoy-camera {
   position: relative;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border);
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
-.buoy-camera-svg {
-  width: 100%;
-  height: auto;
+
+.buoy-camera-frame {
   display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  background: var(--bg-deep);
 }
 
 .buoy-camera-osd {
@@ -1010,6 +1305,24 @@ body {
   letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.buoy-camera-source {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 5, 31, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-decoration: none;
+}
+
+.buoy-camera-source:hover {
+  color: var(--accent);
 }
 
 /* "Podgląd strumienia danych" - wzorowane na sekcji z bentos.info (patrz
@@ -1035,8 +1348,8 @@ body {
   background: var(--bg-deep);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 12px;
-  margin-bottom: 14px;
+  padding: 10px;
+  margin-bottom: 10px;
 }
 
 .buoy-stream-header {
@@ -1079,8 +1392,8 @@ body {
 .buoy-stat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 5px;
+  padding: 7px 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -1129,6 +1442,115 @@ body {
   font-size: 9.5px;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+}
+
+.buoy-chart-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  margin-bottom: 0;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.buoy-detail-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.buoy-detail-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+
+.buoy-chart-toggle {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 9px;
+}
+
+.buoy-chart-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.buoy-chart-tab {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 6px 7px;
+}
+
+.buoy-chart-tab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.buoy-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+}
+
+.buoy-chart-readout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 10px;
+  margin-bottom: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.buoy-chart-readout-label {
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.buoy-chart-readout-time {
+  grid-column: 1;
+}
+
+.buoy-chart-readout strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .buoy-disclaimer {
@@ -1344,7 +1766,12 @@ body {
   }
 
   .brand-badge {
-    padding: 8px 10px;
+    gap: 9px;
+    padding: 7px 8px 7px 10px;
+  }
+
+  .brand-badge-id {
+    padding-right: 9px;
   }
 
   .brand-badge-logo {
@@ -1353,6 +1780,27 @@ body {
 
   .brand-badge-location {
     font-size: 9px;
+  }
+
+  .public-signals {
+    left: 50%;
+    bottom: 126px;
+    width: min(420px, calc(100vw - 20px));
+    padding: 9px 10px 10px;
+  }
+
+  .public-signals.is-collapsed {
+    width: auto;
+    min-width: 190px;
+    padding: 8px 10px;
+  }
+
+  .public-signals-grid {
+    gap: 5px;
+  }
+
+  .public-signal {
+    padding: 6px;
   }
 
   .alpha-badge {
@@ -1364,7 +1812,22 @@ body {
     left: 14px;
     right: 14px;
     width: auto;
-    top: 90px;
-    max-height: calc(100vh - 130px);
+    top: 72px;
+    /* konczy sie nad ocena warunkow (bottom 126px + jej wysokosc), zeby
+       ocena dla wybranej boi byla widoczna rownoczesnie z panelem */
+    max-height: calc(100dvh - 72px - 126px - 124px);
+    overflow-y: auto;
+  }
+
+  .layout.signals-collapsed .buoy-panel {
+    max-height: calc(100dvh - 72px - 126px - 48px);
+  }
+
+  .buoy-panel.has-details .buoy-panel-body {
+    display: block;
+  }
+
+  .buoy-panel-details {
+    margin-bottom: 14px;
   }
 }

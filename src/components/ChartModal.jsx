@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import PointChart from "./PointChart";
+import { useI18n } from "../i18n";
 
 const PIN_LETTERS = "ABCDEFGHIJ";
 
 export default function ChartModal({ point, pointIndex, product, entries, grid, bbox, onClose }) {
+  const { t } = useI18n();
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") onClose();
@@ -21,10 +23,10 @@ export default function ChartModal({ point, pointIndex, product, entries, grid, 
             <span className="modal-title">{product.label}</span>
             <div className="modal-subtitle">
               {point.lat.toFixed(3)}, {point.lon.toFixed(3)} · {entries.length}{" "}
-              {entries.length === 1 ? "klatka" : "klatek"} w dostępnym zakresie
+              {t(entries.length === 1 ? "chart.frame.one" : "chart.frame.many")} {t("chart.range")}
             </div>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Zamknij">
+          <button className="modal-close" onClick={onClose} aria-label={t("common.close")}>
             ×
           </button>
         </div>
