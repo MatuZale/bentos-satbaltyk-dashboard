@@ -450,78 +450,76 @@ body {
   font-weight: 700;
 }
 
-.product-list {
-  display: flex;
-  flex-direction: column;
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
   gap: 6px;
-  padding: 20px 16px 16px;
+  padding: 20px 16px 30px;
 }
 
-.product-btn {
+.product-tile {
+  aspect-ratio: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 11px 14px;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 2px;
+  min-width: 0;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: rgba(15, 28, 81, 0.72);
   backdrop-filter: blur(6px);
   color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  text-align: left;
+  font-family: var(--font-mono);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.product-btn:hover {
+.product-tile:hover {
   border-color: var(--border-strong);
   color: var(--text-primary);
 }
 
-.product-btn.is-active {
+.product-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.product-tile.is-active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
 }
 
-.product-btn-icon {
-  flex: none;
-  width: 18px;
-  height: 18px;
+.product-tile-icon {
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.product-btn-icon svg {
+.product-tile-icon svg {
   width: 100%;
   height: 100%;
   transition: transform 0.2s ease;
 }
 
-.product-btn:hover .product-btn-icon svg {
+.product-tile:hover .product-tile-icon svg {
   animation: icon-pulse 0.6s ease-in-out;
 }
 
-.product-btn-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.product-btn-label {
-  line-height: 1.2;
-}
-
-.product-btn-meta {
-  font-family: var(--font-mono);
-  font-size: 10px;
+.product-tile-label {
+  max-width: 100%;
+  font-size: 9.5px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .panel {
@@ -537,6 +535,13 @@ body {
   color: var(--text-muted);
   margin: 0 0 14px;
   font-weight: 400;
+}
+
+/* Pierwszy panel (nazwa aktywnej warstwy) lezy tuz pod tafla wody z tla
+   panelu - jasniejszy tekst z cieniem, zeby dalo sie go przeczytac. */
+.product-grid + .panel h2 {
+  color: var(--text-primary);
+  text-shadow: 0 1px 6px rgba(0, 9, 61, 0.9);
 }
 
 .legend-strip {
@@ -1761,7 +1766,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pin-marker-ring,
   .measure-cursor-dot,
-  .product-btn:hover .product-btn-icon svg,
+  .product-tile:hover .product-tile-icon svg,
   .play-btn,
   .pin-marker,
   .sidebar,

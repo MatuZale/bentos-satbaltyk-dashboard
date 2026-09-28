@@ -11,3 +11,4 @@ dane/
 
 # Tymczasowe pliki z lokalnych testow (profile przegladarki, zrzuty ekranu)
 .tmp-*
+__pycache__/

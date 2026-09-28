@@ -1,5 +1,5 @@
 // Minimalistyczne ikony liniowe (w duchu ikon uzywanych na bentos.info) -
-// zeby nie dociagac calej biblioteki ikon dla czterech znaczkow.
+// zeby nie dociagac calej biblioteki ikon dla kilku znaczkow.
 const common = {
   fill: "none",
   stroke: "currentColor",
@@ -45,6 +45,17 @@ export function CompassIcon() {
   );
 }
 
+export function OxygenIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="9" cy="13" r="5.5" />
+      <circle cx="17.5" cy="7" r="2.5" />
+      <circle cx="18" cy="17" r="1.3" />
+      <path d="M6.5 11.5a3.5 3.5 0 0 1 2-1.4" />
+    </svg>
+  );
+}
+
 export function BuoyIcon() {
   return (
     <svg {...common}>
@@ -58,6 +69,7 @@ export function BuoyIcon() {
 export const PRODUCT_ICONS = {
   sst: ThermometerIcon,
   chla: DropletIcon,
+  o2: OxygenIcon,
   swh: WavesIcon,
   mwdir: CompassIcon,
 };

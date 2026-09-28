@@ -2,7 +2,7 @@
 """
 Przetwarza eksporty GeoTIFF z SatBaltyk (satbaltyk.pl) do postaci gotowej
 dla dashboardu webowego: przycina do obszaru Morza Baltyckiego,
-przeprojektowuje na EPSG:4326, koloruje wg skali fizycznej i zapisuje jako
+przeprojektowuje na siatke zgodna z Web Mercatorem (Leaflet), koloruje wg skali fizycznej i zapisuje jako
 PNG (do wyswietlenia na mapie) + surowa siatka float32 (do odczytu wartosci
 pod kursorem) + manifest.json (katalog wszystkich dostepnych warstw).
 
@@ -96,6 +96,16 @@ PRODUCTS = {
         "vmin": 0.0,
         "vmax": 8.0,
         "cmap": "viridis",
+        "circular": False,
+    },
+    "o2": {
+        # Metadane eksportu podaja "mg m-3", ale wartosci (8-12) to typowe
+        # stezenia tlenu w wodzie w mg/l - opisujemy je jako mg/l.
+        "label": "Tlen rozpuszczony",
+        "unit": "mg/l",
+        "vmin": 6.0,
+        "vmax": 13.0,
+        "cmap": "magma",
         "circular": False,
     },
     "swh": {
@@ -224,7 +234,7 @@ def reproject_satbaltyk_array(arr: np.ndarray) -> np.ndarray:
 
 
 def warp_to_grid(src_path: Path) -> np.ndarray:
-    """Przycina+reprojektuje do wspolnej siatki EPSG:4326, zwraca float32
+    """Przycina+reprojektuje do wspolnej siatki (wiersze rowne w Mercatorze), zwraca float32
     array (GRID_HEIGHT, GRID_WIDTH) z NaN w miejscu NoData."""
     if src_path.suffix.lower() == ".i32f":
         arr = np.fromfile(src_path, dtype="<f4")
@@ -238,22 +248,21 @@ def warp_to_grid(src_path: Path) -> np.ndarray:
     if gdal is None:
         raise RuntimeError("GDAL jest wymagany do przetwarzania GeoTIFF; pliki .i32f dzialaja bez GDAL")
 
-    warp_opts = gdal.WarpOptions(
-        format="MEM",
-        outputBounds=BBOX,
-        outputBoundsSRS="EPSG:4326",
-        dstSRS="EPSG:4326",
-        width=GRID_WIDTH,
-        height=GRID_HEIGHT,
-        srcNodata=SRC_NODATA,
-        dstNodata=np.nan,
-        resampleAlg="near",  # dane satelitarne/modelowe 1km - bez wygladzania artefaktow na brzegu ladu
-        multithread=True,
-    )
-    ds = gdal.Warp("", str(src_path), options=warp_opts)
+    # GeoTIFF czytamy w calosci (1280x1408, siatka LAEA SatBaltyk) i probkujemy
+    # tak samo jak .i32f. NIE uzywamy gdal.Warp do EPSG:4326: wynik ma rowne
+    # odstepy szerokosci geograficznej, a Leaflet rozciaga ImageOverlay w Web
+    # Mercatorze - nakladka przesuwala sie wzgledem ladu (ok. 0.6 wartosci
+    # bledu na komorke, wyraznie widoczne na mapie).
+    ds = gdal.Open(str(src_path))
+    if (ds.RasterXSize, ds.RasterYSize) != (I32F_WIDTH, I32F_HEIGHT):
+        raise ValueError(f"nieoczekiwany rozmiar rastra: {ds.RasterXSize}x{ds.RasterYSize}")
+    x0, dx, _, y0, _, dy = ds.GetGeoTransform()
+    if (x0, y0, dx, dy) != (SRC_X_MIN, SRC_Y_MAX, SRC_PIXEL_SIZE, -SRC_PIXEL_SIZE):
+        raise ValueError(f"nieoczekiwana georeferencja: {ds.GetGeoTransform()}")
     arr = ds.GetRasterBand(1).ReadAsArray().astype(np.float32)
     ds = None
-    return arr
+    arr = np.where(arr == SRC_NODATA, np.nan, arr).astype(np.float32)
+    return reproject_satbaltyk_array(arr)
 
 
 FEATHER_PX = 16  # ile pikseli od brzegu siatki zanika przezroczystosc
@@ -376,7 +385,7 @@ def run_once() -> dict:
     """Pojedynczy przebieg: skanuje dane/, dopisuje brakujace warstwy,
     zapisuje manifest.json. Zwraca raport (do wypisania w main/watch)."""
     source_dirs = find_source_dirs()
-    report = {"new": [], "failed": [], "unknown": {}, "source_dirs": len(source_dirs)}
+    report = {"new": [], "failed": [], "kept": [], "unknown": {}, "source_dirs": len(source_dirs)}
 
     if not source_dirs:
         return report
@@ -385,6 +394,17 @@ def run_once() -> dict:
     by_product, unknown = scan_products(source_dirs)
     report["unknown"] = unknown
 
+    # Produkty, ktorych nie ma w biezacych eksportach (np. fale - eksport moze
+    # zawierac tylko czesc parametrow), zachowujemy z poprzedniego manifestu,
+    # zeby nowy eksport nie wymazywal ich z dashboardu.
+    previous = {}
+    old_manifest_path = OUT_DIR / "manifest.json"
+    if old_manifest_path.exists():
+        try:
+            previous = json.loads(old_manifest_path.read_text(encoding="utf-8")).get("products", {})
+        except (OSError, ValueError):
+            previous = {}
+
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "bbox": list(BBOX),
@@ -392,6 +412,10 @@ def run_once() -> dict:
         "products": {},
     }
     for product, cfg in PRODUCTS.items():
+        if not by_product[product] and previous.get(product, {}).get("timestamps"):
+            manifest["products"][product] = previous[product]
+            report["kept"].append(product)
+            continue
         manifest["products"][product] = process_product(product, cfg, by_product[product], report)
 
     manifest_path = OUT_DIR / "manifest.json"
@@ -414,6 +438,8 @@ def print_report(report: dict):
     for msg in report["failed"]:
         print(f"  UWAGA: nie udało się przetworzyć {msg} - pominięto.", file=sys.stderr)
 
+    if report["kept"]:
+        print(f"Bez nowych plików w eksporcie - zachowano poprzednie warstwy: {', '.join(report['kept'])}")
     if report["new"]:
         print(f"Nowe klatki: {len(report['new'])}")
     else:
