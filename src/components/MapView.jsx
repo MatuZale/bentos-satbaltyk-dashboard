@@ -5,6 +5,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { PRODUCT_ICONS, BuoyIcon } from "./icons";
 import { BUOYS } from "../data/buoys";
+import { BASEMAPS } from "../data/basemaps";
+import Graticule from "./Graticule";
+import CompareSwipe from "./CompareSwipe";
 import { useI18n } from "../i18n";
 
 const PIN_LETTERS = "ABCDEFGHIJ";
@@ -112,6 +115,9 @@ export default function MapView({
   pinMode,
   buoysVisible,
   selectedBuoyId,
+  basemap,
+  showGraticule,
+  compare, // { imageUrl, productKey } | null - druga warstwa po prawej stronie suwaka
   onHover,
   onPinClick,
   onMapClick,
@@ -126,13 +132,23 @@ export default function MapView({
     ];
   }, [bbox]);
 
-  const [cursor, setCursor] = useState(null); // {x,y} w pikselach kontenera mapy
-  const Icon = PRODUCT_ICONS[productKey];
+  const [cursor, setCursor] = useState(null); // {x,y,side} w pikselach kontenera mapy
+  const [split, setSplit] = useState(0.5); // polozenie granicy porownania (ulamek szerokosci mapy)
+  const mapRef = useRef(null);
+  const Icon = PRODUCT_ICONS[cursor?.side === "right" ? compare?.productKey : productKey] ?? PRODUCT_ICONS[productKey];
+  const tiles = BASEMAPS[basemap] ?? BASEMAPS.dark;
 
+  // Przy porownaniu warstw celownik odczytuje warstwe z tej strony granicy, nad ktora jest kursor.
   function probe(e) {
-    setCursor(e ? e.containerPoint : null);
-    if (e) onHover(e.latlng.lat, e.latlng.lng);
-    else onHover(null, null);
+    if (!e) {
+      setCursor(null);
+      onHover(null, null);
+      return;
+    }
+    const width = mapRef.current?.getSize().x ?? 0;
+    const side = compare && e.containerPoint.x > width * split ? "right" : "left";
+    setCursor({ x: e.containerPoint.x, y: e.containerPoint.y, side });
+    onHover(e.latlng.lat, e.latlng.lng, side);
   }
 
   const pinIcons = useMemo(
@@ -155,15 +171,32 @@ export default function MapView({
       maxBoundsViscosity={1.0}
       className={`map${pinMode ? " map-armed" : ""}`}
       preferCanvas
+      ref={mapRef}
     >
-      {/* Standardowe kafle OSM przyciemnione filtrem CSS (patrz .map .leaflet-tile-pane w App.css) -
-          zeby paleta nakladki nie gryzla sie z jasna mapa, bez zaleznosci od platnych/kluczowanych
-          uslug kafli. Filtr dziala tylko na warstwie kafli, nie na ImageOverlay z danymi. */}
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      />
+      {/* Podklad wybierany w BasemapControl. key wymusza nowa warstwe przy
+          zmianie - Leaflet nie aktualizuje atrybucji ani className w locie.
+          Domyslny "dark" to kafle OSM przyciemnione filtrem CSS (basemap-inverted
+          w App.css), zeby paleta nakladki nie gryzla sie z jasna mapa. */}
+      {tiles.url && (
+        <TileLayer
+          key={basemap}
+          url={tiles.url}
+          attribution={tiles.attribution}
+          maxNativeZoom={tiles.maxNativeZoom}
+          className={tiles.className ?? ""}
+        />
+      )}
       {imageUrl && <ImageOverlay url={imageUrl} bounds={bounds} opacity={0.88} />}
+      {compare && (
+        <CompareSwipe
+          imageUrl={compare.imageUrl}
+          bounds={bounds}
+          split={split}
+          onSplitChange={setSplit}
+          leftKey={productKey}
+          rightKey={compare.productKey}
+        />
+      )}
 
       {pins.map((p, i) => (
         <Marker
@@ -195,6 +228,8 @@ export default function MapView({
             }}
           />
         ))}
+
+      {(showGraticule || !tiles.url) && <Graticule tone={tiles.tone} />}
 
       <FitContainer />
 

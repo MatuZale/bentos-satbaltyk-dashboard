@@ -59,7 +59,11 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* na niskich ekranach (np. rozwiniete porownanie warstw) panel sie przewija */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
   transition: width 0.25s ease, min-width 0.25s ease;
 }
 
@@ -212,12 +216,12 @@ body {
   white-space: nowrap;
 }
 
-/* Przełącznik PL/EN - pigułka z przesuwanym limonkowym "kciukiem"
+/* Przełącznik PL/EN/SV - pigułka z przesuwanym limonkowym "kciukiem"
    (ta sama stylistyka co przełącznik boi w panelu bocznym). */
 .language-switch {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   padding: 3px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-full);
@@ -229,7 +233,7 @@ body {
   top: 3px;
   bottom: 3px;
   left: 3px;
-  width: calc(50% - 3px);
+  width: calc((100% - 6px) / 3);
   border-radius: var(--radius-full);
   background: var(--accent);
   box-shadow: 0 0 10px rgba(170, 255, 0, 0.35);
@@ -238,6 +242,10 @@ body {
 
 .language-switch.is-en .language-switch-thumb {
   transform: translateX(100%);
+}
+
+.language-switch.is-sv .language-switch-thumb {
+  transform: translateX(200%);
 }
 
 .language-switch button {
@@ -286,12 +294,6 @@ body {
   border-radius: var(--radius-md);
 }
 
-.public-signals.is-collapsed {
-  width: auto;
-  min-width: 190px;
-  padding: 8px 10px;
-}
-
 .public-signals-head {
   display: flex;
   align-items: center;
@@ -310,17 +312,13 @@ body {
   font-weight: 700;
 }
 
-.public-signals.is-collapsed .public-signals-head {
-  margin-bottom: 0;
-}
-
 .public-signals-head-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.public-signals-toggle {
+.public-signals-close {
   display: inline-flex;
   width: 20px;
   height: 20px;
@@ -336,7 +334,7 @@ body {
   line-height: 1;
 }
 
-.public-signals-toggle:hover {
+.public-signals-close:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -652,7 +650,7 @@ body {
    zeby duza liczba pinow nie wymuszala scrollowania calego panelu. */
 .points-panel {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 170px; /* przy rozwinietym porownaniu warstw panel boczny raczej sie przewinie, niz zgniecie liste */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1175,10 +1173,11 @@ body {
   height: 100%;
 }
 
-/* "Ubogiego dark mode" dla standardowych kafli OSM - odwrocenie barw + korekta
-   odcienia/jasnosci. Dziala tylko na warstwie kafli (leaflet-tile-pane), wiec
-   nakladka z danymi (leaflet-overlay-pane) zachowuje swoje wlasciwe kolory. */
-.map .leaflet-tile-pane {
+/* "Ubogiego dark mode" dla standardowych kafli OSM (podklad "Ciemna") -
+   odwrocenie barw + korekta odcienia/jasnosci. Klasa siedzi tylko na warstwie
+   kafli, wiec nakladka z danymi zachowuje swoje wlasciwe kolory. Ta sama klasa
+   trafia na miniature w wyborze podkladu. */
+.basemap-inverted {
   filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.92) saturate(0.7);
 }
 
@@ -1200,6 +1199,299 @@ body {
 
 .leaflet-control-attribution a {
   color: var(--text-secondary) !important;
+}
+
+/* Porownanie warstw - pionowa granica przez cala mape z uchwytem posrodku.
+   Sama linia nie lapie myszy (mapa pod nia dalej dziala), tylko uchwyt. */
+.compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 500;
+  width: 0;
+  pointer-events: none;
+}
+
+.compare-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(170, 255, 0, 0.45);
+}
+
+.compare-handle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.compare-handle:focus-visible {
+  outline: none;
+}
+
+.compare-handle:focus-visible .compare-knob {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.compare-knob {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  box-shadow: 0 0 14px rgba(170, 255, 0, 0.45);
+}
+
+.compare-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: rgba(0, 5, 31, 0.78);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.compare-side svg {
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
+}
+
+.compare-body {
+  margin-top: 10px;
+}
+
+.compare-label {
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.compare-switch-row {
+  margin-top: 12px;
+}
+
+.compare-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+}
+
+.compare-chip .chart-metric-tab-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.compare-frame {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Wybor podkladu mapy - kwadratowy przycisk tuz pod kontrolka zoomu Leafleta
+   (ten sam rozmiar i ramka), rozwija panel z miniaturami podkladow. */
+.basemap-control {
+  position: absolute;
+  top: 84px;
+  left: 10px;
+  z-index: 700;
+}
+
+.basemap-toggle {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: var(--surface);
+  background-clip: padding-box;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.basemap-toggle:hover,
+.basemap-toggle.is-open {
+  background-color: var(--surface-alt);
+  color: var(--accent);
+}
+
+.basemap-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.basemap-popover {
+  position: absolute;
+  top: 0;
+  left: 44px;
+  width: 252px;
+  padding: 10px 12px 12px;
+  background: rgba(0, 5, 31, 0.88);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.basemap-popover-title {
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.basemap-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 6px;
+}
+
+.basemap-option {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.basemap-thumb {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  transition: border-color 0.15s ease;
+}
+
+.basemap-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.basemap-thumb.is-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-position: 7px 7px;
+}
+
+.basemap-option:hover .basemap-thumb {
+  border-color: var(--border-strong);
+}
+
+.basemap-option.is-active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.basemap-option.is-active .basemap-thumb {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(170, 255, 0, 0.25);
+}
+
+.basemap-graticule-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.basemap-graticule-row .switch:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Opisy siatki wspolrzednych przy gornej (dlugosc) i lewej (szerokosc)
+   krawedzi mapy. Nad kaflami i nakladka, pod plywajacymi panelami. */
+.graticule-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 450;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.graticule-labels.is-hidden {
+  opacity: 0;
+  transition: none;
+}
+
+.graticule-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.62);
+  text-shadow: 0 0 3px rgba(0, 2, 16, 0.9);
+  white-space: nowrap;
+}
+
+.graticule-labels.is-light .graticule-label {
+  color: rgba(0, 21, 98, 0.75);
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
+}
+
+.graticule-label.is-lon {
+  top: 6px;
+  transform: translateX(-50%);
+}
+
+.graticule-label.is-lat {
+  left: 16px;
+  transform: translateY(-50%);
 }
 
 .state-message {
@@ -1581,6 +1873,36 @@ body {
   padding: 6px 7px;
 }
 
+.chart-metric-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.chart-metric-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.chart-metric-tab-icon {
+  display: flex;
+  width: 14px;
+  height: 14px;
+}
+
+.chart-metric-tab-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.buoy-chart-tab:not(.is-active):hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
 .buoy-chart-tab.is-active {
   background: var(--accent);
   border-color: var(--accent);
@@ -1717,6 +2039,122 @@ body {
   font-size: 13px;
   font-weight: 700;
   color: var(--accent);
+}
+
+.chart-svg.is-pickable,
+.buoy-chart-svg.is-pickable {
+  cursor: pointer;
+}
+
+/* Moment ustawiony aktualnie na mapie - przerywana linia z podpisem "mapa". */
+.chart-map-marker line {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.chart-map-marker text {
+  fill: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.chart-tooltip-row .chart-tooltip-value {
+  color: var(--text-primary);
+}
+
+.chart-tooltip-letter {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.chart-swatch {
+  flex: none;
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.chart-hint {
+  margin: 4px 0 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Wybor punktow do porownania na wykresie - chip jest jednoczesnie legenda
+   (kreska w kolorze serii + litera punktu). */
+.chart-points-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.chart-points-label {
+  margin-right: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.chart-point-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chart-point-chip .chart-swatch {
+  width: 14px;
+  background: var(--border-strong);
+}
+
+.chart-point-chip:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.chart-point-chip.is-on {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.chart-point-chip.is-main {
+  cursor: default;
+}
+
+.chart-point-chip:disabled:not(.is-main) {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.chart-points-limit {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* Delikatne animacje "zywej" strony - sonarowy puls na punktach pomiarowych,
@@ -1869,12 +2307,6 @@ body {
     padding: 9px 10px 10px;
   }
 
-  .public-signals.is-collapsed {
-    width: auto;
-    min-width: 190px;
-    padding: 8px 10px;
-  }
-
   .public-signals-grid {
     gap: 5px;
   }
@@ -1899,8 +2331,8 @@ body {
     overflow-y: auto;
   }
 
-  .layout.signals-collapsed .buoy-panel {
-    max-height: calc(100dvh - 72px - 126px - 48px);
+  .layout.signals-hidden .buoy-panel {
+    max-height: calc(100dvh - 72px - 126px);
   }
 
   .buoy-panel.has-details .buoy-panel-body {

@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import MapView from "./components/MapView";
-import Sidebar from "./components/Sidebar";
+import Sidebar, { PRODUCT_ORDER } from "./components/Sidebar";
 import SidebarWater from "./components/SidebarWater";
 import TimeControl from "./components/TimeControl";
 import Legend from "./components/Legend";
 import PointsPanel from "./components/PointsPanel";
 import ChartModal from "./components/ChartModal";
 import BuoyModal from "./components/BuoyModal";
-import { BUOYS } from "./data/buoys";
-import { getGrid, sampleGrid, sampleGridNearby, findNearestIndex, formatProductValue } from "./utils/grid";
-import { useI18n } from "./i18n";
+import BasemapControl from "./components/BasemapControl";
+import { PRODUCT_ICONS } from "./components/icons";
+import { BUOYS, buoyPlace } from "./data/buoys";
+import { BASEMAPS } from "./data/basemaps";
+import {
+  getGrid,
+  sampleGrid,
+  sampleGridNearby,
+  findNearestIndex,
+  formatProductValue,
+  formatTimestamp,
+} from "./utils/grid";
+import { LANGUAGES, useI18n } from "./i18n";
 import "./App.css";
 
 const PLAY_INTERVAL_MS = 700;
@@ -32,6 +42,27 @@ function resolveManifestUrls(manifest) {
     ])
   );
   return { ...manifest, products };
+}
+
+// Wybor podkladu mapy przezywa przeladowanie strony (jak jezyk interfejsu).
+function useStoredState(key, fallback, isValid = () => true) {
+  const [value, setValue] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw == null ? fallback : JSON.parse(raw);
+      return isValid(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // prywatny tryb / zablokowany storage - wybor po prostu nie przetrwa przeladowania
+    }
+  }, [key, value]);
+  return [value, setValue];
 }
 
 function makePinId() {
@@ -101,7 +132,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1); // mnoznik tempa animacji (0.5x-4x), patrz TimeControl
   const [gridData, setGridData] = useState(null);
-  const [hoverLatLng, setHoverLatLng] = useState(null); // { lat, lon } | null - tylko pozycja kursora
+  const [hoverLatLng, setHoverLatLng] = useState(null); // { lat, lon, side } | null - pozycja kursora i strona suwaka porownania
   const [pins, setPins] = useState([]); // [{ id, lat, lon }]
   const [pinMode, setPinMode] = useState(false); // czy klik na mapie dodaje punkt (jawnie wlaczane przyciskiem)
   const [chartPinId, setChartPinId] = useState(null); // ktory punkt ma otwarty wykres w czasie
@@ -115,10 +146,22 @@ export default function App() {
   const [selectedBuoyId, setSelectedBuoyId] = useState(null);
   const [selectedPinId, setSelectedPinId] = useState(null);
   const [signalGrids, setSignalGrids] = useState({});
-  const [signalsOpen, setSignalsOpen] = useState(true);
+  // id boi/punktu, dla ktorego zamknieto ocene - wraca przy wyborze innego
+  // miejsca albo po odznaczeniu (klik w pusta mape).
+  const [signalsDismissedFor, setSignalsDismissedFor] = useState(null);
+  const [basemap, setBasemap] = useStoredState("bentos-basemap", "dark", (v) => v in BASEMAPS);
+  const [graticule, setGraticule] = useStoredState("bentos-graticule", false, (v) => typeof v === "boolean");
+
+  // Porownanie warstw: druga warstwa po prawej stronie suwaka na mapie, w
+  // klatce najblizszej w czasie do aktualnej klatki glownej warstwy.
+  const [compareOn, setCompareOn] = useState(false);
+  const [compareKey, setCompareKey] = useState("chla");
+  const [compareGrid, setCompareGrid] = useState(null);
 
   const entries = manifest?.products[product]?.timestamps ?? [];
   const currentEntry = entries[index];
+  const compareEntry =
+    compareOn && manifest ? nearestEntryByTime(manifest.products[compareKey]?.timestamps, currentEntry?.t) : null;
 
   // Polling zyje przez caly czas zycia komponentu, wiec aktualny widok czyta
   // z refa - inaczej widzialby wartosci z pierwszego renderu.
@@ -197,6 +240,24 @@ export default function App() {
     };
   }, [currentEntry]);
 
+  useEffect(() => {
+    if (!compareEntry) {
+      setCompareGrid(null);
+      return;
+    }
+    let cancelled = false;
+    getGrid(compareEntry.grid)
+      .then((arr) => {
+        if (!cancelled) setCompareGrid(arr);
+      })
+      .catch(() => {
+        if (!cancelled) setCompareGrid(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [compareEntry?.grid]);
+
   // Podglad nastepnej klatki w tle - animacja gra plynnie bez czekania na fetch
   useEffect(() => {
     if (!entries.length) return;
@@ -215,15 +276,29 @@ export default function App() {
 
   function handleSelectProduct(nextProduct) {
     setPlaying(false);
-    setChartPinId(null); // wykres pokazuje aktywna warstwe - przy zmianie warstwy staje sie nieaktualny
     const nextEntries = manifest.products[nextProduct].timestamps;
     const nearest = findNearestIndex(nextEntries, currentEntry?.t);
+    // ta sama warstwa po obu stronach suwaka nic nie pokazuje - zamieniamy strony
+    if (nextProduct === compareKey) setCompareKey(product);
     setProduct(nextProduct);
     setIndex(nearest);
   }
 
-  function handleHover(lat, lon) {
-    setHoverLatLng(lat == null ? null : { lat, lon });
+  function handleHover(lat, lon, side = "left") {
+    setHoverLatLng(lat == null ? null : { lat, lon, side });
+  }
+
+  function toggleCompare() {
+    if (!compareOn && compareKey === product) {
+      setCompareKey(PRODUCT_ORDER.find((key) => key !== product && manifest.products[key]));
+    }
+    setCompareOn((v) => !v);
+  }
+
+  // Klik w wykres (punktu albo boi) przestawia mape na wskazany moment.
+  function jumpToTime(iso) {
+    setPlaying(false);
+    setIndex(findNearestIndex(entries, iso));
   }
 
   function clearSelection() {
@@ -235,11 +310,13 @@ export default function App() {
   function selectPin(id) {
     clearSelection();
     setSelectedPinId(id);
+    setSignalsDismissedFor((cur) => (cur === id ? cur : null));
   }
 
   function selectBuoy(id) {
     clearSelection();
     setSelectedBuoyId(id);
+    setSignalsDismissedFor((cur) => (cur === id ? cur : null));
     setOpenBuoyId(id);
   }
 
@@ -255,8 +332,12 @@ export default function App() {
   // Klik w puste miejsce mapy: w trybie dodawania stawia punkt, poza nim
   // "wychodzi" z zaznaczenia - bez boi/punktu nie ma tez oceny warunkow.
   function handleMapClick(lat, lon) {
-    if (pinMode) handleAddPin(lat, lon);
-    else clearSelection();
+    if (pinMode) {
+      handleAddPin(lat, lon);
+    } else {
+      clearSelection();
+      setSignalsDismissedFor(null);
+    }
   }
 
   function handleRemovePin(id) {
@@ -278,9 +359,14 @@ export default function App() {
   }
 
   const activeProduct = { ...manifest.products[product], label: t(`product.${product}`) };
+  const compareProduct = compareOn ? manifest.products[compareKey] : null;
+  const hoverOnCompare = compareProduct && hoverLatLng?.side === "right";
+  const hoverGrid = hoverOnCompare ? compareGrid : gridData;
   const hoverValue =
-    hoverLatLng && gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, hoverLatLng.lat, hoverLatLng.lon) : null;
-  const hoverLabel = hoverLatLng ? (formatProductValue(activeProduct, hoverValue) ?? t("common.noData")) : null;
+    hoverLatLng && hoverGrid ? sampleGrid(hoverGrid, manifest.grid, manifest.bbox, hoverLatLng.lat, hoverLatLng.lon) : null;
+  const hoverLabel = hoverLatLng
+    ? (formatProductValue(hoverOnCompare ? compareProduct : activeProduct, hoverValue) ?? t("common.noData"))
+    : null;
   const pointsWithValues = pins.map((p) => {
     const value = gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, p.lat, p.lon) : null;
     return { ...p, label: formatProductValue(activeProduct, value) };
@@ -290,16 +376,17 @@ export default function App() {
   const selectedBuoy = BUOYS.find((b) => b.id === selectedBuoyId) ?? null;
   const signalLocation = selectedBuoy ?? selectedPin;
   const signalScope = selectedBuoy
-    ? t("signal.scopeBuoy", { name: selectedBuoy.name, place: language === "en" ? selectedBuoy.placeEn : selectedBuoy.place })
+    ? t("signal.scopeBuoy", { name: selectedBuoy.name, place: buoyPlace(selectedBuoy, language) })
     : selectedPin
       ? t("signal.scopePoint", { letter: "ABCDEFGHIJ"[selectedPinIndex] ?? "?", lat: selectedPin.lat.toFixed(3), lon: selectedPin.lon.toFixed(3) })
       : null;
-  const publicSignals = signalLocation
+  const signalsVisible = Boolean(signalLocation) && signalsDismissedFor !== signalLocation.id;
+  const publicSignals = signalsVisible
     ? buildPublicSignals(manifest, currentEntry?.t, signalLocation, signalGrids, t)
     : [];
 
   return (
-    <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}${signalsOpen ? "" : " signals-collapsed"}`}>
+    <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}${signalsVisible ? "" : " signals-hidden"}`}>
       <aside className={`sidebar${sidebarOpen ? "" : " is-collapsed"}`}>
         <SidebarWater active={sidebarOpen} />
         <Sidebar products={manifest.products} activeProduct={product} onSelect={handleSelectProduct} />
@@ -321,7 +408,7 @@ export default function App() {
           />
         </section>
 
-        <section className="panel buoys-toggle-panel">
+        <section className="panel buoys-toggle-panel map-toggles-panel">
           <div className="switch-row">
             <span className="switch-label">
               {t("sidebar.buoys")}
@@ -343,6 +430,51 @@ export default function App() {
               <span className="switch-thumb" />
             </button>
           </div>
+          <div className="switch-row compare-switch-row">
+            <span className="switch-label" title={t("compare.hint")}>
+              {t("compare.title")}
+            </span>
+            <button
+              className={`switch${compareOn ? " is-on" : ""}`}
+              role="switch"
+              aria-checked={compareOn}
+              onClick={toggleCompare}
+            >
+              <span className="switch-thumb" />
+            </button>
+          </div>
+          {compareOn && compareProduct && (
+            <div className="compare-body">
+              <div className="compare-label">{t("compare.rightLayer")}</div>
+              <div className="compare-chips" role="group" aria-label={t("compare.rightLayer")}>
+                {PRODUCT_ORDER.filter((key) => key !== product && manifest.products[key]).map((key) => {
+                  const Icon = PRODUCT_ICONS[key];
+                  return (
+                    <button
+                      key={key}
+                      className={`buoy-chart-tab compare-chip${compareKey === key ? " is-active" : ""}`}
+                      onClick={() => setCompareKey(key)}
+                      aria-pressed={compareKey === key}
+                      title={t(`product.${key}`)}
+                    >
+                      {Icon && (
+                        <span className="chart-metric-tab-icon">
+                          <Icon />
+                        </span>
+                      )}
+                      {t(`product.short.${key}`)}
+                    </button>
+                  );
+                })}
+              </div>
+              <Legend product={compareProduct} />
+              {compareEntry && (
+                <div className="compare-frame">
+                  {t("compare.frame", { time: formatTimestamp(compareEntry.t, locale) })}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         <PointsPanel
@@ -392,7 +524,7 @@ export default function App() {
           </div>
           <div className={`language-switch is-${language}`} role="group" aria-label={t("language.label")}>
             <span className="language-switch-thumb" aria-hidden="true" />
-            {["pl", "en"].map((lang) => (
+            {LANGUAGES.map((lang) => (
               <button
                 key={lang}
                 className={language === lang ? "is-active" : ""}
@@ -408,41 +540,40 @@ export default function App() {
         {/* Ocena pojawia sie tylko dla wybranej boi/punktu i zostaje tez przy
             otwartym panelu boi (key na zakresie odpala krotkie podswietlenie,
             zeby bylo widac, ze sie przeliczyla). */}
-        {signalLocation && (
-          <div
-            className={`public-signals${signalsOpen ? "" : " is-collapsed"}`}
-            aria-label={t("signal.aria")}
-          >
+        {signalsVisible && (
+          <div className="public-signals" aria-label={t("signal.aria")}>
             <div className="public-signals-head">
               <span>{t("signal.title")}</span>
               <div className="public-signals-head-actions">
                 <strong>{t("signal.demo")}</strong>
                 <button
-                  className="public-signals-toggle"
-                  onClick={() => setSignalsOpen((open) => !open)}
-                  aria-expanded={signalsOpen}
-                  aria-label={t(signalsOpen ? "signal.hide" : "signal.show")}
-                  title={t(signalsOpen ? "signal.hide" : "signal.show")}
+                  className="public-signals-close"
+                  onClick={() => setSignalsDismissedFor(signalLocation.id)}
+                  aria-label={t("signal.close")}
+                  title={t("signal.close")}
                 >
-                  {signalsOpen ? "−" : "+"}
+                  ×
                 </button>
               </div>
             </div>
-            {signalsOpen && (
-              <>
-                <div className="public-signals-scope" title={signalScope}>{signalScope}</div>
-                <div className="public-signals-grid" key={signalScope}>
-                  {publicSignals.map((signal) => (
-                    <div className={`public-signal is-${signal.tone}`} key={signal.label}>
-                      <span>{signal.label}</span>
-                      <strong>{signal.value}</strong>
-                    </div>
-                  ))}
+            <div className="public-signals-scope" title={signalScope}>{signalScope}</div>
+            <div className="public-signals-grid" key={signalScope}>
+              {publicSignals.map((signal) => (
+                <div className={`public-signal is-${signal.tone}`} key={signal.label}>
+                  <span>{signal.label}</span>
+                  <strong>{signal.value}</strong>
                 </div>
-              </>
-            )}
+              ))}
+            </div>
           </div>
         )}
+
+        <BasemapControl
+          basemap={basemap}
+          onChange={setBasemap}
+          graticule={graticule}
+          onToggleGraticule={() => setGraticule((v) => !v)}
+        />
 
         <div className="alpha-badge">
           <span className="alpha-badge-dot" />
@@ -461,6 +592,9 @@ export default function App() {
           pinMode={pinMode}
           buoysVisible={buoysVisible}
           selectedBuoyId={selectedBuoyId}
+          basemap={basemap}
+          showGraticule={graticule}
+          compare={compareEntry ? { imageUrl: compareEntry.png, productKey: compareKey } : null}
           onHover={handleHover}
           onPinClick={selectPin}
           onMapClick={handleMapClick}
@@ -468,22 +602,19 @@ export default function App() {
         />
       </main>
 
-      {chartPinId &&
-        (() => {
-          const idx = pins.findIndex((p) => p.id === chartPinId);
-          if (idx === -1) return null;
-          return (
-            <ChartModal
-              point={pins[idx]}
-              pointIndex={idx}
-              product={activeProduct}
-              entries={entries}
-              grid={manifest.grid}
-              bbox={manifest.bbox}
-              onClose={() => setChartPinId(null)}
-            />
-          );
-        })()}
+      {chartPinId && pins.some((p) => p.id === chartPinId) && (
+        <ChartModal
+          pins={pins}
+          pointId={chartPinId}
+          products={manifest.products}
+          initialProductKey={product}
+          grid={manifest.grid}
+          bbox={manifest.bbox}
+          currentTime={currentEntry?.t}
+          onPickTime={jumpToTime}
+          onClose={() => setChartPinId(null)}
+        />
+      )}
 
       {openBuoyId &&
         (() => {
@@ -494,6 +625,7 @@ export default function App() {
               buoy={buoy}
               timestampIso={currentEntry?.t}
               entries={entries}
+              onPickTime={jumpToTime}
               onClose={() => setOpenBuoyId(null)}
             />
           );

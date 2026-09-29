@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { formatTimestampShort } from "../utils/grid";
+import { findNearestIndex, formatTimestampShort } from "../utils/grid";
 import { simulateBuoyReading } from "../utils/simulate";
 import { nearestPointIndex } from "../utils/chartAxis";
 import ChartTimeAxis from "./ChartTimeAxis";
@@ -18,7 +18,9 @@ export const BUOY_CHART_METRICS = {
   pressure: { labelKey: "buoy.metric.pressure", unit: "hPa", digits: 0 },
 };
 
-export default function BuoyChart({ buoy, entries, metricKey }) {
+// Bez najechania odczyt pokazuje moment ustawiony na mapie (przerywana linia
+// "mapa"); klik w wykres przestawia mape na wskazany moment.
+export default function BuoyChart({ buoy, entries, metricKey, currentTime, onPickTime }) {
   const { locale, t } = useI18n();
   const [hoverIdx, setHoverIdx] = useState(null);
   const svgRef = useRef(null);
@@ -61,7 +63,14 @@ export default function BuoyChart({ buoy, entries, metricKey }) {
     setHoverIdx(nearestPointIndex(svgRef.current, evt, points, WIDTH));
   }
 
-  const hover = hoverIdx != null ? points[hoverIdx] : points[points.length - 1];
+  const mapIdx = currentTime ? findNearestIndex(series, currentTime) : points.length - 1;
+  const mapX = points[mapIdx].x;
+  const hover = points[hoverIdx ?? mapIdx];
+
+  function handleClick(evt) {
+    const idx = nearestPointIndex(svgRef.current, evt, points, WIDTH);
+    onPickTime?.(series[idx].t);
+  }
   const valueLabel = `${hover.value.toFixed(metric.digits)} ${metric.unit}`;
 
   return (
@@ -74,9 +83,10 @@ export default function BuoyChart({ buoy, entries, metricKey }) {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="buoy-chart-svg"
+        className={`buoy-chart-svg${onPickTime ? " is-pickable" : ""}`}
         onMouseMove={handleMove}
         onMouseLeave={() => setHoverIdx(null)}
+        onClick={handleClick}
       >
         {yTicks.map((v, i) => {
           const y = yFor(v);
@@ -99,11 +109,15 @@ export default function BuoyChart({ buoy, entries, metricKey }) {
           gap={10}
           locale={locale}
         />
+        <g className="chart-map-marker">
+          <line x1={mapX} x2={mapX} y1={PAD.top} y2={PAD.top + INNER_H} />
+        </g>
         <path d={area} className="chart-area" />
         <path d={path} fill="none" className="chart-line" />
         <line x1={hover.x} x2={hover.x} y1={PAD.top} y2={PAD.top + INNER_H} className="chart-crosshair" />
         <circle cx={hover.x} cy={hover.y} r={4} className="chart-hover-dot" />
       </svg>
+      {onPickTime && <p className="chart-hint">{t("chart.clickHint")}</p>}
     </div>
   );
 }

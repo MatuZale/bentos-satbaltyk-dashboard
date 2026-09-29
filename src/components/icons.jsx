@@ -66,6 +66,16 @@ export function BuoyIcon() {
   );
 }
 
+export function LayersIcon() {
+  return (
+    <svg {...common}>
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 12.5 9 5 9-5" />
+      <path d="m3 17 9 5 9-5" />
+    </svg>
+  );
+}
+
 export const PRODUCT_ICONS = {
   sst: ThermometerIcon,
   chla: DropletIcon,

@@ -1,7 +1,7 @@
 import { PRODUCT_ICONS } from "./icons";
 import { useI18n } from "../i18n";
 
-const PRODUCT_ORDER = ["sst", "chla", "o2", "swh", "mwdir"];
+export const PRODUCT_ORDER = ["sst", "chla", "o2", "swh", "mwdir"];
 
 // Kompaktowa siatka kwadratowych kafelkow (ikona + krotka nazwa) zamiast
 // listy przyciskow - kilka warstw miesci sie w jednym rzedzie i nie spycha

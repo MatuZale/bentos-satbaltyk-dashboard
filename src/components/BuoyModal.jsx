@@ -4,11 +4,12 @@ import BuoyChart, { BUOY_CHART_METRICS } from "./BuoyChart";
 import { simulateBuoyReading } from "../utils/simulate";
 import { degToCompass, formatTimestamp } from "../utils/grid";
 import { useAnimatedNumber, shortestAngleDelta } from "../utils/useAnimatedNumber";
+import { buoyPlace } from "../data/buoys";
 import { useI18n } from "../i18n";
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-export default function BuoyModal({ buoy, timestampIso, entries = [], onClose }) {
+export default function BuoyModal({ buoy, timestampIso, entries = [], onPickTime, onClose }) {
   const { language, locale, t } = useI18n();
   const [pos, setPos] = useState(null); // null = domyslna pozycja z CSS (top-right); po przeciagnieciu {x,y}
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -121,7 +122,7 @@ export default function BuoyModal({ buoy, timestampIso, entries = [], onClose })
           <span className="modal-title">{t("buoy.title", { name: buoy.name })}</span>
           <span className="buoy-sim-tag">{t("common.simulation")}</span>
           <div className="modal-subtitle">
-            {language === "en" ? buoy.placeEn : buoy.place} · {buoy.lat.toFixed(4)}, {buoy.lon.toFixed(4)}
+            {buoyPlace(buoy, language)} · {buoy.lat.toFixed(4)}, {buoy.lon.toFixed(4)}
           </div>
         </div>
         <button className="modal-close" onClick={onClose} aria-label={t("common.close")}>
@@ -196,7 +197,13 @@ export default function BuoyModal({ buoy, timestampIso, entries = [], onClose })
                     </button>
                   ))}
                 </div>
-                <BuoyChart buoy={buoy} entries={entries} metricKey={chartMetric} />
+                <BuoyChart
+                  buoy={buoy}
+                  entries={entries}
+                  metricKey={chartMetric}
+                  currentTime={timestampIso}
+                  onPickTime={onPickTime}
+                />
               </div>
             )}
           </div>

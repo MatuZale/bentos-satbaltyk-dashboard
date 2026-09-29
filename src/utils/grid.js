@@ -131,8 +131,10 @@ export function formatTimestampShort(iso, locale = "pl-PL") {
 }
 
 // Pobiera (z cache) siatki dla wszystkich podanych znacznikow czasu i probkuje
-// jedna wspolrzedna z kazdej z nich - do wykresu punktu w czasie.
-export async function loadPointSeries(entries, grid, bbox, lat, lon) {
+// z nich kazdy z punktow - do wykresu punktow w czasie (jedna seria na punkt).
+export async function loadPointsSeries(entries, grid, bbox, points) {
   const arrays = await Promise.all(entries.map((e) => getGrid(e.grid)));
-  return entries.map((e, i) => ({ t: e.t, value: sampleGrid(arrays[i], grid, bbox, lat, lon) }));
+  return points.map((p) =>
+    entries.map((e, i) => ({ t: e.t, value: sampleGrid(arrays[i], grid, bbox, p.lat, p.lon) }))
+  );
 }
