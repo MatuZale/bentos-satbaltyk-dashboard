@@ -18,13 +18,16 @@ export default function BasemapControl({ basemap, onChange, graticule, onToggleG
       if (!rootRef.current?.contains(e.target)) setOpen(false);
     }
     function onKey(e) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      e.preventDefault(); // Esc zamyka tylko ten panel - nie odznacza boi/punktu (patrz App)
+      setOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKey);
+    // faza capture na document: odpala sie przed nasluchem w App (window, bubble)
+    document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 

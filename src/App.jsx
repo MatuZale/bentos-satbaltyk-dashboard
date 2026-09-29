@@ -274,6 +274,25 @@ export default function App() {
     return () => clearInterval(id);
   }, [playing, entries.length, speed]);
 
+  // Esc dziala jak klik w pusta mape: zdejmuje zaznaczenie boi/punktu (i ocene
+  // warunkow). Otwarty wykres punktu sam zamyka sie na Esc - wtedy zaznaczenie
+  // zostaje; Esc zamykajacy wybor podkladu mapy (defaultPrevented) tez go nie rusza.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== "Escape" || e.defaultPrevented || chartPinId) return;
+      // kliknięty znacznik trzyma fokus, a po wcisnieciu klawisza przegladarka
+      // pokazalaby na nim obwodke - odznaczony punkt nie powinien wygladac na wybrany
+      const active = document.activeElement;
+      if (active?.closest?.(".leaflet-marker-icon")) active.blur();
+      setSelectedPinId(null);
+      setSelectedBuoyId(null);
+      setOpenBuoyId(null);
+      setSignalsDismissedFor(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chartPinId]);
+
   function handleSelectProduct(nextProduct) {
     setPlaying(false);
     const nextEntries = manifest.products[nextProduct].timestamps;
@@ -337,6 +356,20 @@ export default function App() {
     } else {
       clearSelection();
       setSignalsDismissedFor(null);
+    }
+  }
+
+  // W trybie dodawania klik w istniejacy punkt go usuwa (stawianie i
+  // poprawianie w jednym miejscu, bez siegania do panelu bocznego). Poza nim
+  // pierwszy klik zaznacza punkt (ocena warunkow), drugi klik w zaznaczony
+  // punkt otwiera jego wykres.
+  function handlePinClick(id) {
+    if (pinMode) {
+      handleRemovePin(id);
+    } else if (selectedPinId === id) {
+      setChartPinId(id);
+    } else {
+      selectPin(id);
     }
   }
 
@@ -557,6 +590,7 @@ export default function App() {
               </div>
             </div>
             <div className="public-signals-scope" title={signalScope}>{signalScope}</div>
+            {selectedPin && <div className="public-signals-hint">{t("signal.chartHint")}</div>}
             <div className="public-signals-grid" key={signalScope}>
               {publicSignals.map((signal) => (
                 <div className={`public-signal is-${signal.tone}`} key={signal.label}>
@@ -596,7 +630,7 @@ export default function App() {
           showGraticule={graticule}
           compare={compareEntry ? { imageUrl: compareEntry.png, productKey: compareKey } : null}
           onHover={handleHover}
-          onPinClick={selectPin}
+          onPinClick={handlePinClick}
           onMapClick={handleMapClick}
           onBuoyClick={selectBuoy}
         />

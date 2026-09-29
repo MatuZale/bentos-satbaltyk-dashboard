@@ -171,8 +171,39 @@ body {
   display: none;
 }
 
-.layout.sidebar-collapsed .sidebar-toggle {
-  left: 0;
+/* Schowany panel: zamiast waskiego uchwytu wyrazna limonkowa zakladka
+   "☰ Warstwy" przyklejona do lewej krawedzi mapy - tak jak przycisk na
+   telefonie, zeby nie trzeba bylo szukac, jak panel przywrocic. */
+@media (min-width: 721px) {
+  .layout.sidebar-collapsed .sidebar-toggle {
+    left: 0;
+    transform: translateY(-50%);
+    width: auto;
+    height: auto;
+    gap: 6px;
+    padding: 12px 16px 12px 14px;
+    border-color: var(--accent);
+    border-left: 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+    box-shadow: 0 0 18px rgba(170, 255, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .layout.sidebar-collapsed .sidebar-toggle:hover {
+    background: #bfff3d;
+    color: var(--accent-ink);
+    padding-left: 18px;
+  }
+
+  .layout.sidebar-collapsed .sidebar-toggle-chevron {
+    display: none;
+  }
+
+  .layout.sidebar-collapsed .sidebar-toggle-label {
+    display: inline;
+  }
 }
 
 /* Plakietka marki pływająca nad mapą (prawy górny róg) - logo Bentos +
@@ -348,6 +379,13 @@ body {
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.public-signals-hint {
+  margin: -4px 0 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
 }
 
 .public-signals-grid {
@@ -976,7 +1014,7 @@ body {
 /* Kursor zmienia sie na celownik tylko w trybie dodawania punktu (patrz
    przycisk "+ Dodaj punkt") - domyslnie mapa zachowuje sie normalnie
    (przeciaganie = Leaflet grab/grabbing), zeby klik nigdy nie zaskakiwal. */
-.map-armed {
+.map.map-armed {
   cursor: crosshair;
 }
 
@@ -1046,6 +1084,18 @@ body {
   border: none;
 }
 
+/* Znaczniki sa fokusowalne (Tab) - zamiast kwadratowej obwodki kontenera
+   divIcon okragly obrys wokol samego punktu/boi. */
+.pin-marker-wrap:focus {
+  outline: none;
+}
+
+.pin-marker-wrap:focus-visible .pin-marker,
+.pin-marker-wrap:focus-visible .buoy-marker {
+  outline: 2px solid var(--accent);
+  outline-offset: 5px;
+}
+
 .pin-marker {
   position: relative;
   width: 30px;
@@ -1062,6 +1112,35 @@ body {
 
 .pin-marker:hover {
   transform: scale(1.12);
+}
+
+/* W trybie dodawania punktow klik w punkt go usuwa - najechanie zapowiada to
+   czerwonym obrysem i krzyzykiem zamiast ikony warstwy. */
+.map-armed .pin-marker:hover {
+  border-color: #ff7a7a;
+  background: #2a0816;
+  box-shadow: 0 0 14px rgba(255, 122, 122, 0.55);
+}
+
+.map-armed .pin-marker:hover .pin-marker-ring {
+  border-color: #ff7a7a;
+}
+
+.map-armed .pin-marker:hover .pin-marker-icon {
+  opacity: 0;
+}
+
+.map-armed .pin-marker:hover::after {
+  content: "×";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff7a7a;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .pin-marker.is-selected {

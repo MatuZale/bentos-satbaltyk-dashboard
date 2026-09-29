@@ -151,6 +151,12 @@ export default function MapView({
     onHover(e.latlng.lat, e.latlng.lng, side);
   }
 
+  // MapContainer ustawia className tylko przy pierwszym renderze, wiec klase
+  // trybu dodawania punktow (celownik, podglad usuwania) przelaczamy recznie.
+  useEffect(() => {
+    mapRef.current?.getContainer().classList.toggle("map-armed", pinMode);
+  }, [pinMode]);
+
   const pinIcons = useMemo(
     () => pins.map((pin, i) => buildPinIcon(PRODUCT_ICONS[productKey], PIN_LETTERS[i] ?? "?", pin.id === selectedPinId)),
     [pins, productKey, selectedPinId]
@@ -169,7 +175,7 @@ export default function MapView({
       maxZoom={13}
       maxBounds={BALTIC_MAX_BOUNDS}
       maxBoundsViscosity={1.0}
-      className={`map${pinMode ? " map-armed" : ""}`}
+      className="map"
       preferCanvas
       ref={mapRef}
     >
