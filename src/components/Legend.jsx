@@ -16,10 +16,11 @@ export default function Legend({ product }) {
           </>
         ) : (
           <>
-            <span>{vmin}</span>
+            {/* wartosci poza skala maja skrajny kolor, stad "+" (i "≤", gdy dol skali to nie zero) */}
+            <span>{vmin > 0 ? `≤${vmin}` : vmin}</span>
             <span>{(vmin + vmax) / 2}</span>
             <span>
-              {vmax} {unit}
+              {vmax}+ {unit}
             </span>
           </>
         )}

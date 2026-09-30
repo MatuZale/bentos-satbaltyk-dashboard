@@ -35,7 +35,7 @@ function formatValue(product, value, t) {
 // maja te same znaczniki czasu (ten sam produkt), wiec dziela os X i celownik.
 // Przerywana linia "mapa" pokazuje moment ustawiony na mapie, a klik w wykres
 // przestawia mape na wskazany moment (onPickTime).
-export default function PointChart({ series: requested, product, entries, grid, bbox, currentTime, onPickTime }) {
+export default function PointChart({ series: requested, product, entries, bbox, currentTime, onPickTime }) {
   const { locale, t } = useI18n();
   // Zaladowane serie trzymamy po id punktu (razem z entries, dla ktorych je
   // policzono) - po odznaczeniu punktu jego seria po prostu znika z rysunku,
@@ -47,7 +47,7 @@ export default function PointChart({ series: requested, product, entries, grid, 
 
   useEffect(() => {
     let cancelled = false;
-    loadPointsSeries(entries, grid, bbox, requested)
+    loadPointsSeries(entries, bbox, requested)
       .then((rows) => {
         if (!cancelled) setLoaded({ entries, byId: Object.fromEntries(requested.map((s, i) => [s.id, rows[i]])) });
       })
@@ -59,7 +59,7 @@ export default function PointChart({ series: requested, product, entries, grid, 
     };
     // serie identyfikuje zestaw id/wspolrzednych - nowa tablica przy kazdym renderze nie ma znaczenia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, grid, bbox, coordsKey]);
+  }, [entries, bbox, coordsKey]);
 
   // Rysujemy tylko serie, ktore sa juz zaladowane dla biezacego produktu.
   const byId = loaded?.entries === entries ? loaded.byId : null;

@@ -3,21 +3,21 @@
 Przetwarza eksporty GeoTIFF z SatBaltyk (satbaltyk.pl) do postaci gotowej
 dla dashboardu webowego: przycina do obszaru Morza Baltyckiego,
 przeprojektowuje na siatke zgodna z Web Mercatorem (Leaflet), koloruje wg skali fizycznej i zapisuje jako
-PNG (do wyswietlenia na mapie) + surowa siatka float32 (do odczytu wartosci
-pod kursorem) + manifest.json (katalog wszystkich dostepnych warstw).
+PNG (do wyswietlenia na mapie) + skompresowana siatka wartosci .grid (do odczytu
+wartosci pod kursorem i wykresow) + manifest.json (katalog wszystkich dostepnych warstw).
 
 Wejscie: dane/<dowolna_nazwa>/snapshots/<produkt>/*.tiff
          (np. dane/export20261010_120000/snapshots/sst/...) - wystarczy wrzucic
          nowy folder eksportu z SatBaltyk do dane/, struktura wewnatrz nie
          musi sie zmieniac.
-Wyjscie: public/data/<produkt>/<timestamp>.png + .f32 + public/data/manifest.json
+Wyjscie: public/data/<produkt>/<timestamp>.png + .grid + public/data/manifest.json
 
 Uruchomienie:
     python3 scripts/process_data.py            # jednorazowo
     python3 scripts/process_data.py --watch     # pilnuje dane/ i przetwarza na biezaco
 
 Skrypt jest idempotentny/przyrostowy - pomija pliki, ktore juz maja gotowy
-PNG+f32 w katalogu wyjsciowym, wiec mozna go bezpiecznie odpalac ponownie po
+PNG+grid w katalogu wyjsciowym, wiec mozna go bezpiecznie odpalac ponownie po
 dorzuceniu kolejnego folderu eksportu do dane/. Nierozpoznane produkty
 (foldery snapshots/<x> bez wpisu w PRODUCTS) i uszkodzone/nieczytelne pliki
 sa raportowane, ale nie przerywaja przetwarzania reszty.
@@ -26,8 +26,10 @@ import argparse
 import json
 import os
 import re
+import struct
 import sys
 import time
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -58,8 +60,20 @@ OUT_DIR = ROOT / "public" / "data"
 # Obszar Morza Baltyckiego (lon_min, lat_min, lon_max, lat_max, EPSG:4326).
 # Te same granice sa uzywane przez aplikacje jako logiczny obszar nawigacji.
 BBOX = (9.0, 53.0, 31.5, 66.5)
-GRID_WIDTH = 360
-GRID_HEIGHT = 216
+# Siatka wyjsciowa ma kwadratowe piksele w Web Mercatorze (tak jak ImageOverlay
+# w Leaflet). Zrodlo ma 1 km; 720 kolumn to ok. 2 km na szerokosci Trojmiasta
+# (kolumny sa rowne co do dlugosci geograficznej, wiec na polnocy sa gesciej).
+# Wiecej = ostrzej, ale proporcjonalnie wiecej danych do pobrania (PNG + .grid
+# rosna mniej wiecej z kwadratem GRID_WIDTH).
+GRID_WIDTH = 720
+GRID_HEIGHT = round(
+    GRID_WIDTH
+    * (
+        np.log(np.tan(np.pi / 4.0 + np.deg2rad(BBOX[3]) / 2.0))
+        - np.log(np.tan(np.pi / 4.0 + np.deg2rad(BBOX[1]) / 2.0))
+    )
+    / np.deg2rad(BBOX[2] - BBOX[0])
+)
 I32F_WIDTH = 1280
 I32F_HEIGHT = 1408
 SRC_X_MIN = 3_628_000.0
@@ -78,6 +92,13 @@ PROCESSOR_MTIME_NS = Path(__file__).stat().st_mtime_ns
 
 FNAME_RE = re.compile(r"^(\d{8})_(\d{6})-")
 
+# vmin/vmax to tylko zakres kolorow: wartosci poza nim dostaja skrajny kolor
+# (legenda oznacza to "8+"), ale zostaja w danych - przy zakwicie chlorofil
+# bywa kilkukrotnie wyzszy niz 8 mg/m3 i to wlasnie ten punkt jest najciekawszy.
+# "valid" to granice fizycznie mozliwych wartosci - poza nimi to blad w danych
+# (NaN). "step" to krok kwantyzacji siatki .grid (0.01 = 2 miejsca po przecinku
+# jak w odczycie na mapie; zrodlowy chlorofil ma zreszta precyzje 0.1).
+#
 # Kolormapy: wylacznie perceptualnie jednorodne, bezpieczne dla daltonizmu
 # (rodzina matplotlib viridis/plasma/cividis + twilight dla wielkosci katowych) -
 # zadnej "teczowej" skali (jet/hsv/turbo), zeby odczyt nie zalezal od percepcji barw.
@@ -89,6 +110,8 @@ PRODUCTS = {
         "vmax": 22.0,
         "cmap": "plasma",
         "circular": False,
+        "step": 0.01,
+        "valid": (-5.0, 35.0),
     },
     "chla": {
         "label": "Chlorofil a",
@@ -97,6 +120,8 @@ PRODUCTS = {
         "vmax": 8.0,
         "cmap": "viridis",
         "circular": False,
+        "step": 0.01,
+        "valid": (0.0, 300.0),
     },
     "o2": {
         # Metadane eksportu podaja "mg m-3", ale wartosci (8-12) to typowe
@@ -107,6 +132,8 @@ PRODUCTS = {
         "vmax": 13.0,
         "cmap": "magma",
         "circular": False,
+        "step": 0.01,
+        "valid": (0.0, 30.0),
     },
     "swh": {
         "label": "Wysokość fali (SWH)",
@@ -115,6 +142,8 @@ PRODUCTS = {
         "vmax": 2.5,
         "cmap": "cividis",
         "circular": False,
+        "step": 0.01,
+        "valid": (0.0, 25.0),
     },
     "mwdir": {
         "label": "Kierunek fali",
@@ -123,6 +152,8 @@ PRODUCTS = {
         "vmax": 360.0,
         "cmap": "twilight_shifted",
         "circular": True,
+        "step": 0.1,
+        "valid": (0.0, 360.0),
     },
 }
 
@@ -265,7 +296,7 @@ def warp_to_grid(src_path: Path) -> np.ndarray:
     return reproject_satbaltyk_array(arr)
 
 
-FEATHER_PX = 16  # ile pikseli od brzegu siatki zanika przezroczystosc
+FEATHER_PX = round(GRID_WIDTH * 16 / 360)  # ile pikseli od brzegu siatki zanika przezroczystosc (ta sama szerokosc pasa co przy 360 kolumnach)
 
 
 def feather_alpha(alpha: np.ndarray) -> np.ndarray:
@@ -282,6 +313,7 @@ def feather_alpha(alpha: np.ndarray) -> np.ndarray:
 
 def colorize(arr: np.ndarray, cfg: dict) -> Image.Image:
     valid = ~np.isnan(arr)
+    # clip=True: wartosci poza skala dostaja skrajny kolor zamiast znikac
     norm = mcolors.Normalize(vmin=cfg["vmin"], vmax=cfg["vmax"], clip=True)
     colormap = mpl.colormaps[cfg["cmap"]]
     rgba = colormap(norm(np.nan_to_num(arr, nan=cfg["vmin"])))
@@ -301,14 +333,42 @@ def make_legend(cfg: dict, path: Path, width=256, height=28):
     Image.fromarray(img, mode="RGB").save(path)
 
 
-def output_grid_ok(path: Path, cfg: dict) -> bool:
-    if not path.exists() or path.stat().st_size != GRID_WIDTH * GRID_HEIGHT * 4:
+# Format .grid: naglowek (little-endian) u16 szerokosc, u16 wysokosc, f32 krok
+# kwantyzacji, potem strumien zlib z int16 (wiersz po wierszu, kazda wartosc
+# jako roznica wzgledem poprzedniej w wierszu - gladkie dane kompresuja sie
+# wtedy kilkukrotnie lepiej). Wartosc = int16 * krok, NODATA_Q oznacza brak
+# danych. Przegladarka rozpakowuje to DecompressionStream (src/utils/grid.js).
+NODATA_Q = -32768
+GRID_HEADER = struct.Struct("<HHf")
+
+
+def write_grid(path: Path, arr: np.ndarray, step: float):
+    q = np.full(arr.shape, NODATA_Q, dtype=np.int16)
+    valid = ~np.isnan(arr)
+    q[valid] = np.clip(np.round(arr[valid] / step), -32767, 32767).astype(np.int16)
+    delta = np.diff(q, axis=1, prepend=np.zeros((arr.shape[0], 1), dtype=np.int16))  # int16 zawija sie tak samo jak przy sumowaniu w JS
+    height, width = arr.shape
+    path.write_bytes(GRID_HEADER.pack(width, height, step) + zlib.compress(delta.astype("<i2").tobytes(), 9))
+
+
+def read_grid(path: Path) -> np.ndarray:
+    """Odczyt .grid do float32 z NaN (do statystyk i kontroli po stronie skryptu)."""
+    data = path.read_bytes()
+    width, height, step = GRID_HEADER.unpack_from(data)
+    delta = np.frombuffer(zlib.decompress(data[GRID_HEADER.size :]), dtype="<i2").reshape((height, width))
+    q = np.cumsum(delta, axis=1, dtype=np.int16)
+    arr = q.astype(np.float32) * np.float32(step)
+    arr[q == NODATA_Q] = np.nan
+    return arr
+
+
+def output_grid_ok(path: Path) -> bool:
+    if not path.exists():
         return False
-    arr = np.fromfile(path, dtype="<f4")
-    valid = arr[~np.isnan(arr)]
-    if valid.size == 0:
-        return True
-    return bool(np.all((valid >= cfg["vmin"]) & (valid <= cfg["vmax"])))
+    try:
+        return read_grid(path).shape == (GRID_HEIGHT, GRID_WIDTH)
+    except (OSError, ValueError, zlib.error, struct.error):
+        return False
 
 
 def process_product(product: str, cfg: dict, files: dict, report: dict) -> dict:
@@ -322,38 +382,38 @@ def process_product(product: str, cfg: dict, files: dict, report: dict) -> dict:
         src = files[ts_iso]
         stamp = ts_iso.replace(":", "").replace("-", "").replace("+0000", "Z")
         png_path = out_dir / f"{stamp}.png"
-        f32_path = out_dir / f"{stamp}.f32"
+        grid_path = out_dir / f"{stamp}.grid"
+        (out_dir / f"{stamp}.f32").unlink(missing_ok=True)  # pozostalosc po starym formacie siatek
         outputs_fresh = (
             png_path.exists()
-            and f32_path.exists()
+            and grid_path.exists()
             and png_path.stat().st_mtime_ns >= src.stat().st_mtime_ns
-            and f32_path.stat().st_mtime_ns >= src.stat().st_mtime_ns
+            and grid_path.stat().st_mtime_ns >= src.stat().st_mtime_ns
             and png_path.stat().st_mtime_ns >= PROCESSOR_MTIME_NS
-            and f32_path.stat().st_mtime_ns >= PROCESSOR_MTIME_NS
+            and grid_path.stat().st_mtime_ns >= PROCESSOR_MTIME_NS
         )
-        f32_ok = outputs_fresh and output_grid_ok(f32_path, cfg)
+        grid_ok = outputs_fresh and output_grid_ok(grid_path)
 
-        if not png_path.exists() or not f32_ok:
+        if not png_path.exists() or not grid_ok:
             try:
                 arr = warp_to_grid(src)
                 if cfg["circular"]:
                     # mwdir w plikach zrodlowych jest w konwencji -180..180 -
                     # sprowadzamy do standardowych 0..360 (od polnocy, zgodnie z ruchem wskazowek)
                     arr = np.where(np.isnan(arr), arr, (arr + 360.0) % 360.0)
-                    arr = np.where((arr >= cfg["vmin"]) & (arr <= cfg["vmax"]), arr, np.nan)
-                else:
-                    arr = np.where((arr >= cfg["vmin"]) & (arr <= cfg["vmax"]), arr, np.nan)
-                colorize(arr, cfg).save(png_path)
-                arr.astype("<f4").tofile(f32_path)
+                lo, hi = cfg["valid"]
+                arr = np.where((arr >= lo) & (arr <= hi), arr, np.nan)
+                colorize(arr, cfg).save(png_path, optimize=True)
+                write_grid(grid_path, arr, cfg["step"])
             except Exception as exc:  # noqa: BLE001 - chcemy przetworzyc reszte mimo bledu jednego pliku
                 report["failed"].append(f"{product}/{src.name}: {exc}")
                 png_path.unlink(missing_ok=True)
-                f32_path.unlink(missing_ok=True)
+                grid_path.unlink(missing_ok=True)
                 continue
             report["new"].append(f"{product}/{stamp}")
             print(f"  [{product}] {stamp} <- {src.name}")
 
-        valid = np.fromfile(f32_path, dtype="<f4")
+        valid = read_grid(grid_path)
         valid = valid[~np.isnan(valid)]
         stats = (
             {"min": float(valid.min()), "max": float(valid.max()), "mean": float(valid.mean())}
@@ -365,7 +425,7 @@ def process_product(product: str, cfg: dict, files: dict, report: dict) -> dict:
             {
                 "t": ts_iso,
                 "png": f"data/{product}/{stamp}.png",
-                "grid": f"data/{product}/{stamp}.f32",
+                "grid": f"data/{product}/{stamp}.grid",
                 "stats": stats,
             }
         )
@@ -376,6 +436,7 @@ def process_product(product: str, cfg: dict, files: dict, report: dict) -> dict:
         "vmin": cfg["vmin"],
         "vmax": cfg["vmax"],
         "circular": cfg["circular"],
+        "grid": {"width": GRID_WIDTH, "height": GRID_HEIGHT},
         "legend": f"data/{product}/legend.png",
         "timestamps": entries,
     }
@@ -408,7 +469,6 @@ def run_once() -> dict:
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "bbox": list(BBOX),
-        "grid": {"width": GRID_WIDTH, "height": GRID_HEIGHT},
         "products": {},
     }
     for product, cfg in PRODUCTS.items():

@@ -15,7 +15,7 @@ const COMPARE_COLORS = ["#3987e5", "#d95926"];
 
 // Wykres startuje od warstwy aktywnej na mapie, ale parametr mozna zmienic
 // zakladkami bez zamykania okna - kazdy produkt ma wlasne znaczniki czasu.
-export default function ChartModal({ pins, pointId, products, initialProductKey, grid, bbox, currentTime, onPickTime, onClose }) {
+export default function ChartModal({ pins, pointId, products, initialProductKey, bbox, currentTime, onPickTime, onClose }) {
   const { t } = useI18n();
   const [productKey, setProductKey] = useState(initialProductKey);
   // id punktu -> indeks koloru; kolor zostaje przy punkcie, nawet gdy inny
@@ -126,7 +126,6 @@ export default function ChartModal({ pins, pointId, products, initialProductKey,
           series={series}
           product={product}
           entries={entries}
-          grid={grid}
           bbox={bbox}
           currentTime={currentTime}
           onPickTime={onPickTime}

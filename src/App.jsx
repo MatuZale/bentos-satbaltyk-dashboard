@@ -85,7 +85,6 @@ function buildPublicSignals(manifest, currentIso, location, signalGrids, t) {
     if (location && signalGrids[productKey]) {
       const localValue = sampleGridNearby(
         signalGrids[productKey],
-        manifest.grid,
         manifest.bbox,
         location.lat,
         location.lon
@@ -397,12 +396,12 @@ export default function App() {
   const hoverOnCompare = compareProduct && hoverLatLng?.side === "right";
   const hoverGrid = hoverOnCompare ? compareGrid : gridData;
   const hoverValue =
-    hoverLatLng && hoverGrid ? sampleGrid(hoverGrid, manifest.grid, manifest.bbox, hoverLatLng.lat, hoverLatLng.lon) : null;
+    hoverLatLng && hoverGrid ? sampleGrid(hoverGrid, manifest.bbox, hoverLatLng.lat, hoverLatLng.lon) : null;
   const hoverLabel = hoverLatLng
     ? (formatProductValue(hoverOnCompare ? compareProduct : activeProduct, hoverValue) ?? t("common.noData"))
     : null;
   const pointsWithValues = pins.map((p) => {
-    const value = gridData ? sampleGrid(gridData, manifest.grid, manifest.bbox, p.lat, p.lon) : null;
+    const value = gridData ? sampleGrid(gridData, manifest.bbox, p.lat, p.lon) : null;
     return { ...p, label: formatProductValue(activeProduct, value) };
   });
   const selectedPinIndex = pins.findIndex((p) => p.id === selectedPinId);
@@ -666,7 +665,6 @@ export default function App() {
           pointId={chartPinId}
           products={manifest.products}
           initialProductKey={product}
-          grid={manifest.grid}
           bbox={manifest.bbox}
           currentTime={currentEntry?.t}
           onPickTime={jumpToTime}
