@@ -43,14 +43,25 @@ body {
 }
 
 .layout {
+  /* Na desktopie panel boczny NAKLADA sie na mapę (mapa ma zawsze pełną
+     szerokość i nie zmienia rozmiaru przy chowaniu panelu - dzięki temu nic
+     się nie przelicza ani nie "pływa" w trakcie animacji). Elementy
+     przyklejone do lewej strony mapy odsuwają się o --sidebar-offset. */
+  --sidebar-width: 340px;
+  --sidebar-offset: var(--sidebar-width);
+  --sidebar-ease: 0.32s cubic-bezier(0.22, 0.8, 0.26, 1);
   display: flex;
   height: 100vh;
   position: relative;
 }
 
+.layout.sidebar-collapsed {
+  --sidebar-offset: 0px;
+}
+
 .sidebar {
-  width: 340px;
-  min-width: 340px;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   /* Pod animowaną taflą (SidebarWater) prosty gradient w kolorach hero
      bentos.info: granatowy błękit #001562 gasnący w ciemną toń. */
   position: relative;
@@ -64,18 +75,31 @@ body {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
-  transition: width 0.25s ease, min-width 0.25s ease;
 }
 
-.sidebar.is-collapsed {
-  width: 0;
-  min-width: 0;
-  border-right-color: transparent;
+@media (min-width: 721px) {
+  .sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 700; /* nad mapą, pod uchwytem (800) i panelem boi (900) */
+    box-shadow: 10px 0 36px rgba(0, 0, 0, 0.35);
+    transition: transform var(--sidebar-ease), box-shadow var(--sidebar-ease), visibility 0s;
+  }
+
+  /* visibility z opoznieniem: po wsunieciu panel znika tez dla klawiatury
+     (Tab nie wchodzi w schowane elementy), ale dopiero po animacji */
+  .sidebar.is-collapsed {
+    transform: translateX(-100%);
+    visibility: hidden;
+    box-shadow: none;
+    transition: transform var(--sidebar-ease), box-shadow var(--sidebar-ease), visibility 0s linear 0.32s;
+  }
 }
 
-/* Stała szerokość (a nie 100%), żeby przy animacji chowania panelu wideo
-   było przycinane, a nie przeskalowywane. z-index -1 w izolowanym kontekście
-   .sidebar = nad jego tłem, pod całą zawartością. */
+/* z-index -1 w izolowanym kontekście .sidebar = nad jego tłem, pod całą
+   zawartością. */
 .sidebar-water {
   position: absolute;
   top: 0;
@@ -141,11 +165,11 @@ body {
 }
 
 /* Zawsze widoczny uchwyt do chowania/pokazywania panelu - siedzi dokladnie
-   na granicy panelu i mapy, przesuwa sie razem z animacja szerokosci. */
+   na granicy panelu i mapy, przesuwa sie razem z animacja panelu. */
 .sidebar-toggle {
   position: absolute;
   top: 50%;
-  left: 340px;
+  left: var(--sidebar-width);
   transform: translate(-50%, -50%);
   z-index: 800;
   width: 22px;
@@ -159,7 +183,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: left 0.25s ease, background 0.15s, color 0.15s;
+  transition: left var(--sidebar-ease), background 0.15s, color 0.15s;
 }
 
 .sidebar-toggle:hover {
@@ -313,7 +337,8 @@ body {
 
 .public-signals {
   position: absolute;
-  left: 50%;
+  left: calc(50% + var(--sidebar-offset, 0px) / 2); /* srodek widocznej czesci mapy */
+  transition: left var(--sidebar-ease);
   bottom: 64px;
   transform: translateX(-50%);
   z-index: 650;
@@ -512,7 +537,8 @@ body {
 .alpha-badge {
   position: absolute;
   bottom: 14px;
-  left: 14px;
+  left: calc(var(--sidebar-offset, 0px) + 14px);
+  transition: left var(--sidebar-ease);
   z-index: 650;
   display: flex;
   align-items: center;
@@ -1081,7 +1107,8 @@ body {
 .pin-mode-hint {
   position: absolute;
   top: 14px;
-  left: 50%;
+  left: calc(50% + var(--sidebar-offset, 0px) / 2);
+  transition: left var(--sidebar-ease);
   transform: translateX(-50%);
   z-index: 650;
   background: var(--accent);
@@ -1321,6 +1348,12 @@ body {
 }
 
 /* Leaflet: przemalowanie kontrolek/popupów pod ciemny motyw */
+/* kontrolki po lewej (zoom) odsuwaja sie od panelu razem z jego animacja */
+.layout .leaflet-left {
+  left: var(--sidebar-offset, 0px);
+  transition: left var(--sidebar-ease);
+}
+
 .leaflet-control-zoom a {
   background: var(--surface) !important;
   color: var(--text-primary) !important;
@@ -1470,7 +1503,8 @@ body {
 .basemap-control {
   position: absolute;
   top: 84px;
-  left: 10px;
+  left: calc(var(--sidebar-offset, 0px) + 10px);
+  transition: left var(--sidebar-ease);
   z-index: 700;
 }
 
@@ -1629,7 +1663,8 @@ body {
 }
 
 .graticule-label.is-lat {
-  left: 16px;
+  left: calc(var(--sidebar-offset, 0px) + 16px);
+  transition: left var(--sidebar-ease);
   transform: translateY(-50%);
 }
 
@@ -1691,6 +1726,7 @@ body {
   top: 86px;
   right: 14px;
   z-index: 900;
+  transition: width var(--sidebar-ease);
   width: min(360px, calc(100vw - 380px));
   background: var(--bg-deep);
   border: 1px solid var(--border-strong);
@@ -2360,6 +2396,11 @@ body {
      "szuflada" na cala wysokosc, wywolywana przyciskiem, a nie stale
      wciskana kolumna 55vh (przy dzisiejszej ilosci sekcji nic by sie nie
      miescilo). */
+  .layout,
+  .layout.sidebar-collapsed {
+    --sidebar-offset: 0px;
+  }
+
   .sidebar {
     position: fixed;
     inset: 0;

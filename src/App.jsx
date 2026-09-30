@@ -122,8 +122,25 @@ function buildPublicSignals(manifest, currentIso, location, signalGrids, t) {
   ];
 }
 
+// Czy panel boczny nakłada się na mapę (desktop) - na telefonie to szuflada
+// na cały ekran i mapa nie potrzebuje odsunięcia (patrz .sidebar w App.css).
+function useSidebarOverlaysMap() {
+  const query = "(min-width: 721px)";
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatches(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return matches;
+}
+
+const SIDEBAR_WIDTH_PX = 340; // jak --sidebar-width w App.css
+
 export default function App() {
   const { language, setLanguage, locale, t } = useI18n();
+  const sidebarOverlaysMap = useSidebarOverlaysMap();
   const [manifest, setManifest] = useState(null);
   const [error, setError] = useState(null);
   const [product, setProduct] = useState("sst");
@@ -651,6 +668,8 @@ export default function App() {
           selectedBuoyId={selectedBuoyId}
           basemap={basemap}
           showGraticule={graticule}
+          leftInset={sidebarOverlaysMap && sidebarOpen ? SIDEBAR_WIDTH_PX : 0}
+          westMargin={sidebarOverlaysMap ? SIDEBAR_WIDTH_PX + 24 : 0}
           compare={compareEntry ? { imageUrl: compareEntry.png, productKey: compareKey } : null}
           onHover={handleHover}
           onPinClick={handlePinClick}

@@ -12,7 +12,7 @@ const PANE = "compare";
 // liczymy we wspolrzednych warstwy (layer point) i odswiezamy przy kazdym ruchu.
 // Glowna nakladka (overlayPane) jest przycinana symetrycznie do lewej strony -
 // inaczej przeswitywalaby po prawej tam, gdzie druga warstwa nie ma danych.
-export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, onHandleActive, leftKey, rightKey }) {
+export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, onHandleActive, leftInset = 0, leftKey, rightKey }) {
   const map = useMap();
   const { t } = useI18n();
   const handleRef = useRef(null);
@@ -57,11 +57,21 @@ export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, o
     L.DomEvent.disableScrollPropagation(el);
   }, []);
 
+  // Granica nie moze wejsc pod panel boczny (zaslania mape z lewej) - uchwyt
+  // zniknalby i nie dalo sie go zlapac. Panel otwierany przy granicy, ktora
+  // juz tam jest, odsuwa ja na krawedz panelu.
+  const minSplit = () => Math.max(0.05, (leftInset + 24) / map.getSize().x);
+
   function moveTo(clientX) {
     const rect = map.getContainer().getBoundingClientRect();
     const frac = (clientX - rect.left) / rect.width;
-    onSplitChange(Math.min(0.95, Math.max(0.05, frac)));
+    onSplitChange(Math.min(0.95, Math.max(minSplit(), frac)));
   }
+
+  useEffect(() => {
+    if (split < minSplit()) onSplitChange(minSplit());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftInset]);
 
   // Nad uchwytem (i podczas przeciagania) celownik z odczytem wartosci sie
   // chowa - inaczej "chodzilby" za kursorem razem z przesuwana granica.
@@ -100,7 +110,7 @@ export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, o
 
   function onKeyDown(e) {
     const step = e.shiftKey ? 0.1 : 0.02;
-    if (e.key === "ArrowLeft") onSplitChange(Math.max(0.05, split - step));
+    if (e.key === "ArrowLeft") onSplitChange(Math.max(minSplit(), split - step));
     if (e.key === "ArrowRight") onSplitChange(Math.min(0.95, split + step));
   }
 

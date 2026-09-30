@@ -130,6 +130,25 @@ function PinSideTracker({ pins, split, active, onChange }) {
   return null;
 }
 
+// Panel boczny nakłada się na mapę, więc granice nawigacji poszerzamy na zachód
+// o jego szerokość (przeliczoną na stopnie dla aktualnego zoomu) - inaczej
+// dane przy zachodniej krawędzi dałoby się przesunąć co najwyżej pod panel.
+// Margines jest stały, niezależny od tego, czy panel jest otwarty, żeby
+// chowanie panelu nigdy nie przesuwało mapy.
+function WestMargin({ px }) {
+  const map = useMap();
+  function apply() {
+    const degrees = (px * 360) / (256 * 2 ** map.getZoom());
+    map.setMaxBounds([
+      [BALTIC_MAX_BOUNDS[0][0], BALTIC_MAX_BOUNDS[0][1] - degrees],
+      BALTIC_MAX_BOUNDS[1],
+    ]);
+  }
+  useEffect(apply, [map, px]); // eslint-disable-line react-hooks/exhaustive-deps
+  useMapEvents({ zoomend: apply });
+  return null;
+}
+
 export default function MapView({
   bbox,
   imageUrl,
@@ -142,6 +161,8 @@ export default function MapView({
   selectedBuoyId,
   basemap,
   showGraticule,
+  westMargin = 0, // px dodatkowego marginesu nawigacji na zachód (szerokość panelu bocznego na desktopie)
+  leftInset, // px mapy zasłonięte z lewej przez panel boczny (mapa ma zawsze pełną szerokość)
   compare, // { imageUrl, productKey } | null - druga warstwa po prawej stronie suwaka
   onHover,
   onPinClick,
@@ -230,6 +251,7 @@ export default function MapView({
           bounds={bounds}
           split={split}
           onSplitChange={setSplit}
+          leftInset={leftInset}
           onHandleActive={(active) => {
             handleActiveRef.current = active;
             if (active) probe(null);
@@ -275,6 +297,7 @@ export default function MapView({
       {(showGraticule || !tiles.url) && <Graticule tone={tiles.tone} />}
 
       <FitContainer />
+      <WestMargin px={westMargin} />
 
       <MapInteractions
         onProbe={probe}
