@@ -12,7 +12,7 @@ const PANE = "compare";
 // liczymy we wspolrzednych warstwy (layer point) i odswiezamy przy kazdym ruchu.
 // Glowna nakladka (overlayPane) jest przycinana symetrycznie do lewej strony -
 // inaczej przeswitywalaby po prawej tam, gdzie druga warstwa nie ma danych.
-export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, leftKey, rightKey }) {
+export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, onHandleActive, leftKey, rightKey }) {
   const map = useMap();
   const { t } = useI18n();
   const handleRef = useRef(null);
@@ -63,9 +63,35 @@ export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, l
     onSplitChange(Math.min(0.95, Math.max(0.05, frac)));
   }
 
+  // Nad uchwytem (i podczas przeciagania) celownik z odczytem wartosci sie
+  // chowa - inaczej "chodzilby" za kursorem razem z przesuwana granica.
+  const hoveringRef = useRef(false);
+  const draggingRef = useRef(false);
+  function reportActive() {
+    onHandleActive?.(hoveringRef.current || draggingRef.current);
+  }
+  useEffect(() => () => onHandleActive?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   function onPointerDown(e) {
     e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+    reportActive();
     moveTo(e.clientX);
+  }
+
+  function onPointerEnter() {
+    hoveringRef.current = true;
+    reportActive();
+  }
+
+  function onPointerLeave() {
+    hoveringRef.current = false;
+    reportActive();
+  }
+
+  function onPointerEnd() {
+    draggingRef.current = false;
+    reportActive();
   }
 
   function onPointerMove(e) {
@@ -96,6 +122,9 @@ export default function CompareSwipe({ imageUrl, bounds, split, onSplitChange, l
           aria-valuenow={Math.round(split * 100)}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
+          onPointerEnter={onPointerEnter}
+          onPointerLeave={onPointerLeave}
+          onLostPointerCapture={onPointerEnd}
           onKeyDown={onKeyDown}
         >
           <span className="compare-side is-left">

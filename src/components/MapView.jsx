@@ -160,13 +160,14 @@ export default function MapView({
   const [cursor, setCursor] = useState(null); // {x,y,side} w pikselach kontenera mapy
   const [split, setSplit] = useState(0.5); // polozenie granicy porownania (ulamek szerokosci mapy)
   const [pinSides, setPinSides] = useState({}); // id punktu -> "left" | "right" (tylko przy porownaniu)
+  const handleActiveRef = useRef(false); // kursor nad uchwytem porownania albo jego przeciaganie - bez celownika
   const mapRef = useRef(null);
   const Icon = PRODUCT_ICONS[cursor?.side === "right" ? compare?.productKey : productKey] ?? PRODUCT_ICONS[productKey];
   const tiles = BASEMAPS[basemap] ?? BASEMAPS.dark;
 
   // Przy porownaniu warstw celownik odczytuje warstwe z tej strony granicy, nad ktora jest kursor.
   function probe(e) {
-    if (!e) {
+    if (!e || handleActiveRef.current) {
       setCursor(null);
       onHover(null, null);
       return;
@@ -229,6 +230,10 @@ export default function MapView({
           bounds={bounds}
           split={split}
           onSplitChange={setSplit}
+          onHandleActive={(active) => {
+            handleActiveRef.current = active;
+            if (active) probe(null);
+          }}
           leftKey={productKey}
           rightKey={compare.productKey}
         />
