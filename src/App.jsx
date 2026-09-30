@@ -438,7 +438,10 @@ export default function App() {
   return (
     <div className={`layout${sidebarOpen ? "" : " sidebar-collapsed"}${signalsVisible ? "" : " signals-hidden"}`}>
       <aside className={`sidebar${sidebarOpen ? "" : " is-collapsed"}`}>
-        <SidebarWater active={sidebarOpen} />
+        <SidebarWater
+          active={sidebarOpen}
+          simTime={playing && currentEntry ? new Date(currentEntry.t).getTime() : null}
+        />
         <Sidebar products={manifest.products} activeProduct={product} onSelect={handleSelectProduct} />
 
         <section className="panel">

@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { skyTheme, sunPosition } from "../utils/sky";
+import { useAnimatedNumber } from "../utils/useAnimatedNumber";
 
 const BASE = import.meta.env.BASE_URL;
 const RAYS = [
@@ -11,8 +13,12 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+const LIVE_CLOCK_MS = 60000; // jak czesto odswiezamy "teraz", gdy nie gra animacja czasu
+const SKY_EASE_MS = 1200; // plynne dobieganie do nowej pory dnia (np. start/stop animacji)
+
 // Drobinki dryfujace w toni - ta sama mechanika co canvas w hero bentos.info.
-function startParticles(canvas) {
+// colorRef = [r, g, b, mnoznik przezroczystosci] - zmienia sie z pora dnia.
+function startParticles(canvas, colorRef) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return () => {};
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -51,7 +57,8 @@ function startParticles(canvas) {
       if (p.x > w + 4) p.x = -4;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(220, 240, 255, ${p.a})`;
+      const [r, g, b, alphaScale] = colorRef.current;
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${Math.min(1, p.a * alphaScale)})`;
       ctx.fill();
     }
     raf = requestAnimationFrame(frame);
@@ -70,9 +77,24 @@ function startParticles(canvas) {
 // Tlo gornej czesci panelu: tafla wody (wideo z hero bentos.info) + promienie
 // i drobinki, wygaszane maska w jednolity gradient panelu. `active` = panel
 // widoczny; schowany nie zjada CPU/GPU na niewidoczna animacje.
-export default function SidebarWater({ active }) {
+// Kolory, slonce/ksiezyc i drobinki zmieniaja sie z pora dnia nad Trojmiastem:
+// `simTime` (ms) to czas klatki z suwaka, gdy gra animacja czasu; bez niego
+// (null) bierzemy zegar lokalny.
+export default function SidebarWater({ active, simTime = null }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), LIVE_CLOCK_MS);
+    return () => clearInterval(id);
+  }, []);
+  const target = sunPosition(simTime ?? now);
+  const altitude = useAnimatedNumber(target.altitude, { duration: SKY_EASE_MS });
+  const sinAzimuth = useAnimatedNumber(Math.sin((target.azimuth * Math.PI) / 180), { duration: SKY_EASE_MS });
+  const sky = useMemo(() => skyTheme(altitude, sinAzimuth), [altitude, sinAzimuth]);
+  const particleColorRef = useRef(sky.particle);
+  particleColorRef.current = sky.particle.map((v, i) => (i < 3 ? Math.round(v) : v));
 
   useEffect(() => {
     const video = videoRef.current;
@@ -85,11 +107,11 @@ export default function SidebarWater({ active }) {
 
   useEffect(() => {
     if (!active || prefersReducedMotion()) return;
-    return startParticles(canvasRef.current);
+    return startParticles(canvasRef.current, particleColorRef);
   }, [active]);
 
   return (
-    <div className="sidebar-water" aria-hidden="true">
+    <div className="sidebar-water" aria-hidden="true" style={sky.vars}>
       <video
         ref={videoRef}
         className="sidebar-water-video"
@@ -101,6 +123,8 @@ export default function SidebarWater({ active }) {
         preload="metadata"
       />
       <div className="sidebar-water-tint" />
+      <div className="sidebar-water-sun" />
+      <div className="sidebar-water-moon" />
       <div className="sidebar-water-rays">
         {RAYS.map((ray) => (
           <span
