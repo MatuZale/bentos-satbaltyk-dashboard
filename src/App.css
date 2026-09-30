@@ -365,9 +365,69 @@ body {
   line-height: 1;
 }
 
-.public-signals-close:hover {
+.public-signals-close:hover,
+.public-signals-info:hover,
+.public-signals-info.is-open {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.public-signals-info {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: none;
+}
+
+.public-signals-explain {
+  margin-top: 8px;
+  padding-top: 8px;
+  max-height: min(34vh, 240px);
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.public-signals-explain p {
+  margin: 0 0 6px;
+}
+
+.public-signals-explain dl {
+  margin: 0;
+}
+
+.public-signals-explain dt {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.public-signals-explain dd {
+  margin: 1px 0 0;
+}
+
+.public-signals-explain .public-signals-explain-note {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .public-signals-scope {

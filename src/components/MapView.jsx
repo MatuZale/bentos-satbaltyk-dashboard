@@ -105,6 +105,31 @@ function FitContainer() {
   return null;
 }
 
+// Przy porownaniu warstw kazdy punkt lezy po jednej ze stron granicy, wiec jego
+// ikona ma pokazywac warstwe z tej strony. Strona wynika z polozenia punktu w
+// pikselach kontenera (zmienia sie przy przesuwaniu mapy, zoomie i uchwycie).
+function PinSideTracker({ pins, split, active, onChange }) {
+  const map = useMap();
+
+  function update() {
+    const width = map.getSize().x;
+    const next = {};
+    if (active) {
+      for (const p of pins) {
+        next[p.id] = map.latLngToContainerPoint([p.lat, p.lon]).x > width * split ? "right" : "left";
+      }
+    }
+    onChange((prev) => {
+      const keys = Object.keys(next);
+      return keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k]) ? prev : next;
+    });
+  }
+
+  useEffect(update, [map, pins, split, active]);
+  useMapEvents({ move: update, zoomend: update, resize: update });
+  return null;
+}
+
 export default function MapView({
   bbox,
   imageUrl,
@@ -134,6 +159,7 @@ export default function MapView({
 
   const [cursor, setCursor] = useState(null); // {x,y,side} w pikselach kontenera mapy
   const [split, setSplit] = useState(0.5); // polozenie granicy porownania (ulamek szerokosci mapy)
+  const [pinSides, setPinSides] = useState({}); // id punktu -> "left" | "right" (tylko przy porownaniu)
   const mapRef = useRef(null);
   const Icon = PRODUCT_ICONS[cursor?.side === "right" ? compare?.productKey : productKey] ?? PRODUCT_ICONS[productKey];
   const tiles = BASEMAPS[basemap] ?? BASEMAPS.dark;
@@ -158,8 +184,12 @@ export default function MapView({
   }, [pinMode]);
 
   const pinIcons = useMemo(
-    () => pins.map((pin, i) => buildPinIcon(PRODUCT_ICONS[productKey], PIN_LETTERS[i] ?? "?", pin.id === selectedPinId)),
-    [pins, productKey, selectedPinId]
+    () =>
+      pins.map((pin, i) => {
+        const key = compare && pinSides[pin.id] === "right" ? compare.productKey : productKey;
+        return buildPinIcon(PRODUCT_ICONS[key], PIN_LETTERS[i] ?? "?", pin.id === selectedPinId);
+      }),
+    [pins, productKey, compare?.productKey, pinSides, selectedPinId]
   );
 
   const buoyIcons = useMemo(
@@ -203,6 +233,8 @@ export default function MapView({
           rightKey={compare.productKey}
         />
       )}
+
+      <PinSideTracker pins={pins} split={split} active={Boolean(compare)} onChange={setPinSides} />
 
       {pins.map((p, i) => (
         <Marker

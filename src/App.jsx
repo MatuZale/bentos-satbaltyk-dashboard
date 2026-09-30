@@ -149,6 +149,7 @@ export default function App() {
   // id boi/punktu, dla ktorego zamknieto ocene - wraca przy wyborze innego
   // miejsca albo po odznaczeniu (klik w pusta mape).
   const [signalsDismissedFor, setSignalsDismissedFor] = useState(null);
+  const [signalsInfoOpen, setSignalsInfoOpen] = useState(false); // objasnienie, co znacza poziomy oceny
   const [basemap, setBasemap] = useStoredState("bentos-basemap", "dark", (v) => v in BASEMAPS);
   const [graticule, setGraticule] = useStoredState("bentos-graticule", false, (v) => typeof v === "boolean");
 
@@ -580,6 +581,15 @@ export default function App() {
               <div className="public-signals-head-actions">
                 <strong>{t("signal.demo")}</strong>
                 <button
+                  className={`public-signals-info${signalsInfoOpen ? " is-open" : ""}`}
+                  onClick={() => setSignalsInfoOpen((v) => !v)}
+                  aria-expanded={signalsInfoOpen}
+                  aria-label={t("signal.info")}
+                  title={t("signal.info")}
+                >
+                  i
+                </button>
+                <button
                   className="public-signals-close"
                   onClick={() => setSignalsDismissedFor(signalLocation.id)}
                   aria-label={t("signal.close")}
@@ -599,6 +609,20 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {signalsInfoOpen && (
+              <div className="public-signals-explain">
+                <p>{t("signal.infoIntro")}</p>
+                <dl>
+                  <dt>{t("signal.bathing")}</dt>
+                  <dd>{t("signal.infoBathing")}</dd>
+                  <dt>{t("signal.cyanobacteria")}</dt>
+                  <dd>{t("signal.infoCyano")}</dd>
+                  <dt>{t("signal.comfort")}</dt>
+                  <dd>{t("signal.infoComfort")}</dd>
+                </dl>
+                <p className="public-signals-explain-note">{t("signal.infoNote")}</p>
+              </div>
+            )}
           </div>
         )}
 
